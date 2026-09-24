@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E1C18">
+  <meta name="description" content="Oak Core sandbox — read-only shared login test. Does not change live apps.">
+  <title>Oak Core Sandbox</title>
+  <!--
+    Sandbox note: no service worker on purpose.
+    Skip SW so GitHub Pages / phone caches never confuse this demo with live apps.
+    Network-only: always load the latest oak-core.js from this repo.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../oak-theme.css?v=1">
+</head>
+<body>
+  <div class="sandbox-banner">
+    SANDBOX — read-only login test. Does not change your live apps or user list.
+  </div>
+
+  <div class="wrap" id="app">
+    <div class="card loading" id="boot">Loading users…</div>
+  </div>
+
+  <footer class="foot">
+    Oak Core v<span id="ver">1</span> · boardStock · read-only · SeanOakJoinery/oak-core
+  </footer>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <!-- Firebase compat 10.13.0 (apps load SDK; OakCore assumes window.firebase) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+  <!-- Relative paths: on GitHub Pages this is /oak-core/demo/ → ../oak-core.js = /oak-core/oak-core.js -->
+  <script src="../oak-core.js?v=1"></script>
+  <script>
+(function () {
+  "use strict";
+
+  var esc = OakCore.esc;
+  var APP_LABELS = OakCore.APP_LABELS;
+  var core = OakCore.createApp({ appId: "boardStock", readOnly: true });
+
+  var view = "boot"; // boot | pick | pin | success
+  var selectedUserId = null;
+  var loginError = "";
+  var currentUser = null;
+  var pinBusy = false;
+
+  document.getElementById("ver").textContent = OakCore.VERSION;
+
+  function toast(msg) {
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.classList.remove("show"); }, 2800);
+  }
+
+  function appsNote(u) {
+    var apps = u.apps || OakCore.defaultApps();
+    var parts = [];
+    Object.keys(APP_LABELS).forEach(function (k) {
+      if (apps[k]) parts.push(APP_LABELS[k]);
+    });
+    if (!u.apps) return "All apps (legacy)";
+    if (core.isMainRoot(u)) return "All apps (Main root)";
+    return parts.length ? parts.join(" · ") : "No apps ticked";
+  }
+
+  function hasBoardStock(u) {
+    return core.userHasApp(u, "boardStock");
+  }
+
+  function findUser(id) {
+    return core.getUsers().find(function (u) { return u && u.id === id; }) || null;
+  }
+
+  async function attemptLogin() {
+    if (pinBusy) return;
+    var pinEl = document.getElementById("pin");
+    var pin = pinEl ? pinEl.value : "";
+    pinBusy = true;
+    loginError = "";
+    var btn = document.getElementById("btnLogin");
+    if (btn) btn.disabled = true;
+    try {
+      currentUser = await core.login(selectedUserId, pin);
+      view = "success";
+      toast("Login OK — nothing written to Firebase");
+    } catch (err) {
+      loginError = err && err.message ? err.message : "Login failed";
+      view = "pin";
+    } finally {
+      pinBusy = false;
+      render();
+    }
+  }
+
+  function render() {
+    var root = document.getElementById("app");
+
+    if (view === "boot") {
+      root.innerHTML = '<div class="card loading">Loading users from Firebase…</div>';
+      return;
+    }
+
+    if (view === "pick") {
+      var list = core.getUsers().filter(function (u) { return u && u.username; });
+      list.sort(function (a, b) {
+        return String(a.username).localeCompare(String(b.username), "en");
+      });
+
+      var html = '<div class="card">';
+      html += "<h2>Oak Core Sandbox</h2>";
+      html += '<p class="muted small">Pick a person, then enter their PIN. Nothing is saved — this only proves shared login via oak-core.js.</p>';
+      html += '<p class="muted small">App under test: <strong>Board Stock</strong>. Everyone is listed; people without Board Stock access are refused at login.</p>';
+
+      if (!list.length) {
+        html += '<p class="err">No users loaded yet. Check your connection and reload.</p>';
+      } else {
+        html += '<ul class="user-list">';
+        list.forEach(function (u) {
+          var ok = hasBoardStock(u);
+          var flags = [];
+          if (core.isMainRoot(u)) flags.push("Main root");
+          else if (u.isRoot) flags.push("Root");
+          if (!ok) flags.push("no Board Stock");
+          html += '<li><button type="button" class="user-pick" data-id="' + esc(u.id) + '">';
+          html += '<span class="uname">' + esc(u.username);
+          if (flags.length) {
+            html += ' <span class="badge' + (ok ? "" : " warn") + '">' + esc(flags.join(" · ")) + "</span>";
+          }
+          html += "</span>";
+          html += '<span class="uapps">' + esc(appsNote(u)) + "</span>";
+          html += "</button></li>";
+        });
+        html += "</ul>";
+      }
+      html += "</div>";
+      root.innerHTML = html;
+
+      root.querySelectorAll(".user-pick").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          selectedUserId = btn.getAttribute("data-id");
+          loginError = "";
+          view = "pin";
+          render();
+        });
+      });
+      return;
+    }
+
+    if (view === "pin") {
+      var user = findUser(selectedUserId);
+      var html = '<div class="card">';
+      html += "<h2>Enter PIN</h2>";
+      if (user) {
+        html += "<p>Signing in as <strong>" + esc(user.username) + "</strong></p>";
+        html += '<p class="muted small">' + esc(appsNote(user)) + "</p>";
+      } else {
+        html += '<p class="err">User not found — go back and pick again.</p>';
+      }
+      html += '<label class="field" for="pin">PIN</label>';
+      html += '<input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="••••">';
+      html += '<p class="err" id="pinErr">' + esc(loginError) + "</p>";
+      html += '<div class="row-actions">';
+      html += '<button type="button" class="btn btn-primary" id="btnLogin"' + (pinBusy ? " disabled" : "") + ">Log in</button>";
+      html += '<button type="button" class="btn btn-ghost" id="btnBack">Back</button>';
+      html += "</div></div>";
+      root.innerHTML = html;
+
+      var pinEl = document.getElementById("pin");
+      if (pinEl) pinEl.focus();
+      document.getElementById("btnBack").addEventListener("click", function () {
+        view = "pick";
+        loginError = "";
+        selectedUserId = null;
+        render();
+      });
+      document.getElementById("btnLogin").addEventListener("click", attemptLogin);
+      if (pinEl) {
+        pinEl.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") attemptLogin();
+        });
+      }
+      return;
+    }
+
+    if (view === "success" && currentUser) {
+      var u = currentUser;
+      var apps = u.apps || OakCore.defaultApps();
+      var html = '<div class="card">';
+      html += "<h2>Login OK</h2>";
+      html += '<p class="muted small">Shared auth via oak-core.js · VERSION ' + esc(OakCore.VERSION) + "</p>";
+      html += '<ul class="kv">';
+      html += '<li><span class="k">Username</span><span class="v">' + esc(u.username) + "</span></li>";
+      html += '<li><span class="k">Main root</span><span class="v">' + (core.isMainRoot(u) ? "Yes" : "No") + "</span></li>";
+      html += '<li><span class="k">Root</span><span class="v">' + (u.isRoot ? "Yes" : "No") + "</span></li>";
+      html += '<li><span class="k">OakCore.VERSION</span><span class="v">' + esc(OakCore.VERSION) + "</span></li>";
+      html += "</ul>";
+
+      html += '<p class="muted small" style="margin-top:14px">Apps</p><div>';
+      Object.keys(APP_LABELS).forEach(function (k) {
+        var on = !!apps[k] || core.isMainRoot(u) || !u.apps;
+        html += '<span class="badge' + (on ? " ok" : "") + '">' + (on ? "✓ " : "✗ ") + esc(APP_LABELS[k]) + "</span>";
+      });
+      html += "</div>";
+
+      var perms = u.permissions || {};
+      var keys = Object.keys(perms).filter(function (k) { return perms[k]; }).slice(0, 8);
+      if (keys.length) {
+        html += '<p class="muted small" style="margin-top:14px">Sample permissions (ticked)</p><div>';
+        keys.forEach(function (k) {
+          html += '<span class="badge">' + esc(k) + "</span>";
+        });
+        html += "</div>";
+      }
+
+      html += '<div class="success-note">';
+      html += "This proved shared login via oak-core.js. Your Dispatch / Board / Stock / Consumables repos were not modified.";
+      html += "</div>";
+
+      html += '<div class="row-actions">';
+      html += '<button type="button" class="btn btn-primary" id="btnLogout">Log out</button>';
+      html += "</div></div>";
+      root.innerHTML = html;
+
+      document.getElementById("btnLogout").addEventListener("click", function () {
+        currentUser = null;
+        selectedUserId = null;
+        loginError = "";
+        view = "pick";
+        toast("Logged out — still read-only");
+        render();
+      });
+    }
+  }
+
+  try {
+    core.init();
+    core.startUsersSync(function () {
+      if (view === "boot") {
+        view = "pick";
+        render();
+      } else if (view === "pick") {
+        render(); // refresh user list only — do not wipe PIN / success screens
+      }
+    });
+    setTimeout(function () {
+      if (view === "boot") {
+        view = "pick";
+        render();
+        if (!core.getUsers().length) toast("Still waiting for users — check network");
+      }
+    }, 8000);
+  } catch (err) {
+    document.getElementById("app").innerHTML =
+      '<div class="card"><h2>Could not start</h2><p class="err">' +
+      esc(err && err.message ? err.message : String(err)) +
+      "</p></div>";
+  }
+})();
+  </script>
+</body>
+</html>
