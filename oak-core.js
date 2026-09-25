@@ -4,9 +4,13 @@
  * Sandbox / Option A: load this script after Firebase compat (app + database).
  * Apps own their Firebase SDK load; OakCore assumes window.firebase exists.
  *
- * Live apps currently .set() the whole users array on dispatchBoard/users.
- * Core v1 keeps that behaviour when readOnly is false.
- * Merge-safe writes come later (do not change live apps from this sandbox).
+ * v2 (2026-09-25): saveUsers() is MERGE-SAFE. It no longer overwrites the
+ * whole dispatchBoard/users list from this device's copy. It works out what
+ * THIS device changed (added / edited / deleted users, matched by id) since
+ * it last heard from the server and applies only that, inside a Firebase
+ * transaction — so two people editing users at the same time (or Dispatch
+ * saving its board) can't undo each other. Same function names as v1, so
+ * apps don't need changing.
  *
  * Usage:
  *   var core = OakCore.createApp({ appId: "boardStock", readOnly: true });
@@ -16,7 +20,7 @@
 (function (global) {
   "use strict";
 
-  var VERSION = "1";
+  var VERSION = "2";
 
   var FIREBASE_CONFIG = {
     apiKey: "AIzaSyCkoUkLIlxdxD2AAEpLGW4dzqkSeC5lVh0",
@@ -53,6 +57,39 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
+  function clone(v) {
+    return v === undefined ? null : JSON.parse(JSON.stringify(v));
+  }
+  function asList(v) {
+    if (Array.isArray(v)) return v.filter(function (x) { return x != null; });
+    if (v && typeof v === "object") return Object.keys(v).map(function (k) { return v[k]; }).filter(function (x) { return x != null; });
+    return [];
+  }
+  // 3-way merge by id: base = last server copy seen, local = what this
+  // device wants, remote = server's current copy.
+  function mergeUsers(baseIn, localIn, remoteIn) {
+    var base = asList(baseIn), local = asList(localIn), remote = asList(remoteIn);
+    var baseMap = {}, localMap = {};
+    base.forEach(function (u) { if (u && u.id != null) baseMap[u.id] = u; });
+    local.forEach(function (u) { if (u && u.id != null) localMap[u.id] = u; });
+    function changedHere(id) {
+      var l = localMap[id], b = baseMap[id];
+      return !!l && (!b || JSON.stringify(l) !== JSON.stringify(b));
+    }
+    var out = [], seen = {};
+    remote.forEach(function (r) {
+      if (!r || r.id == null) return;
+      seen[r.id] = true;
+      if (baseMap[r.id] && !localMap[r.id]) return;          // deleted on this device
+      out.push(changedHere(r.id) ? localMap[r.id] : r);       // edited here wins
+    });
+    local.forEach(function (l) {
+      if (!l || l.id == null || seen[l.id]) return;
+      if (!baseMap[l.id] || changedHere(l.id)) out.push(l);   // added here / edited here but gone remotely
+    });
+    return out;
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -73,6 +110,7 @@
     var fbApp = null;
     var dispatchBoardRef = null;
     var users = [];
+    var usersBase = null; // deep copy of the last server list (for merge-safe saves)
     var usersListener = null;
     var onUsersChange = null;
 
@@ -148,7 +186,8 @@
         "value",
         function (snap) {
           var val = snap.val();
-          users = Array.isArray(val) ? val : [];
+          users = asList(val);
+          usersBase = clone(users);
           if (onUsersChange) onUsersChange(getUsers());
         },
         function (err) {
@@ -201,11 +240,18 @@
       if (!dispatchBoardRef) {
         throw new Error("OakCore.saveUsers: call init() first");
       }
-      // Same as live apps: whole-array .set() on dispatchBoard/users.
-      // Merge-safe / per-user writes are planned for a later core version.
-      await dispatchBoardRef.child("users").set(nextUsers);
-      users = Array.isArray(nextUsers) ? nextUsers.slice() : [];
-      return users;
+      var local = clone(asList(nextUsers));
+      var base = usersBase;
+      var res = await dispatchBoardRef.child("users").transaction(function (current) {
+        if (!current) return local;                 // empty on server: write ours
+        if (!base) return mergeUsers([], local, current); // never synced: only add / edit, never delete
+        return mergeUsers(base, local, current);
+      });
+      if (res && res.committed && res.snapshot) {
+        users = asList(res.snapshot.val());
+        usersBase = clone(users);
+      }
+      return users.slice();
     }
 
     return {
@@ -237,6 +283,7 @@
     hashPin: hashPin,
     uid: uid,
     esc: esc,
+    mergeUsers: mergeUsers,
     createApp: createApp
   };
 })(typeof window !== "undefined" ? window : this);
