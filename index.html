@@ -59,6 +59,8 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
 .tile .n{font-family:var(--font-m);font-weight:600;font-size:17px;margin-top:14px}
 .tile .d{font-size:12px;color:var(--muted);margin-top:2px}
 .none{padding:18px;text-align:center}
+.tile.wide{grid-column:1/-1;min-height:auto;flex-direction:row;align-items:center;gap:14px}
+.tile.wide .n{margin-top:0}
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:22px;font-size:12px;color:var(--muted)}
 .link{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:6px 0}
 .hint{margin-top:16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
@@ -92,8 +94,18 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
     { id:"boardStock",  name:"Board Stock", desc:"Board take & reorders", url:"/Board-Stock-Take/",
       icon:'<rect x="4" y="4" width="16" height="5" rx="1"/><rect x="4" y="10.5" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="3" rx="1"/>' },
     { id:"consumables", name:"Consumables", desc:"Fixings & finishing", url:"/Consumables-Stock-Take/",
-      icon:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' }
+      icon:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' },
+    { id:"stockIn",     name:"Stock In",    desc:"Delivery notes, invoices, Excel", url:"/oak-core/stock-in/",
+      icon:'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
+      visible: function(u){ return stockInAllowed(u); } }
   ];
+  function hasPerm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
+  // Stock In shows for anyone who may add stock to at least one app.
+  function stockInAllowed(u){
+    return (core.userHasApp(u, "boardStock") && hasPerm(u, "boardAddQty")) ||
+           (core.userHasApp(u, "consumables") && (hasPerm(u, "consManageItems") || hasPerm(u, "consManageConsumables"))) ||
+           (core.userHasApp(u, "stock") && hasPerm(u, "stockAddQty"));
+  }
 
   var LAST_KEY = "oakHomeLastUser";
   var S = OakCore.session;   // shared by all four apps: log in here once
@@ -113,7 +125,8 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   var fails = 0, lockedUntil = 0;
 
   function findUser(id){ return core.getUsers().find(function(u){ return u && u.id === id; }) || null; }
-  function allowedApps(u){ return APPS.filter(function(a){ return core.userHasApp(u, a.id); }); }
+  function canUse(u, a){ return a.visible ? a.visible(u) : core.userHasApp(u, a.id); }
+  function allowedApps(u){ return APPS.filter(function(a){ return canUse(u, a); }); }
 
   function restore(){
     var r = S.resolve(core.getUsers());
@@ -126,7 +139,7 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   function goNext(){
     if(!nextApp || !user) return false;
     var a = appById(nextApp); nextApp = null;
-    if(a && core.userHasApp(user, a.id)){ openApp(a); return true; }
+    if(a && canUse(user, a)){ openApp(a); return true; }
     if(a) notice = "You don't have access to " + a.name + ". Ask Sean if you need it.";
     return false;
   }
@@ -212,7 +225,7 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
       } else {
         h += '<div class="tiles">';
         apps.forEach(function(a){
-          h += '<a class="tile" href="' + a.url + '"><div class="ic"><svg viewBox="0 0 24 24">' + a.icon + '</svg></div>' +
+          h += '<a class="tile' + (a.id === 'stockIn' ? ' wide' : '') + '" href="' + a.url + '"><div class="ic"><svg viewBox="0 0 24 24">' + a.icon + '</svg></div>' +
                '<div><div class="n">' + esc(a.name) + '</div><div class="d">' + esc(a.desc) + '</div></div></a>';
         });
         h += '</div>';

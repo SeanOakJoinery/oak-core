@@ -16,6 +16,7 @@ The four apps stay separate (own repos, own data). They share the login through 
 | `index.html` | The home app (login + app buttons) |
 | `oak-core.js` | Shared library every app loads: Firebase config, PIN hash, merge-safe user saves (v2), one-login session (v3) |
 | `manifest.json`, `sw.js`, `icon-*.png` | Makes the home app installable ("Add to Home Screen") |
+| `stock-in/` | **Stock In** app — add delivered stock to Board Stock, Consumables or Stock List from a delivery note / invoice (PDF or photo), pasted lines, or the Excel template |
 | `demo/` | Old sandbox link — now forwards to the home app |
 
 ## How the one login works (v3)
@@ -27,3 +28,15 @@ The four apps stay separate (own repos, own data). They share the login through 
 - Troubleshooting: add `?local=1` to an app's URL to use that app's own login screen.
 
 Apps load `https://seanoakjoinery.github.io/oak-core/oak-core.js?v=3` — bump the `?v=` in all four apps whenever this file changes (their service workers cache it).
+
+## Stock In (`/oak-core/stock-in/`)
+
+1. Choose the app (Board Stock / Consumables / Stock List) and the location.
+2. Upload a PDF invoice, a photo of a delivery note, an Excel/CSV file, paste lines, or type them.
+3. Check each line (green = matched, amber = please check, blue = new item), fix anything, press **Add to stock**.
+
+- PDFs with text are read directly (pdf.js); photos and scanned PDFs are read in the browser with OCR (tesseract.js) — nothing is sent anywhere.
+- Matches you confirm are remembered per app at `stockIn/aliases/<app>`, so the supplier's codes/wording match automatically next time.
+- Every delivery is recorded at `stockIn/receipts` (who, when, doc no., lines); the document itself is kept in Storage at `stockInDocs/` when allowed.
+- Board Stock gets a normal "add" log entry per line; Stock List gets an activity-log entry.
+- Who sees it: anyone with Add Stock in Board Stock (boardAddQty), Restock in Consumables (consManageItems / consManageConsumables) or Add in Stock List (stockAddQty). New items need Add Boards / Manage items / Add.
