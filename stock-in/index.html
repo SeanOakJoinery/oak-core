@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery Stock In — add delivered stock to Board Stock, Consumables or Stock List from a delivery note, invoice, photo or Excel.">
+<title>Stock In</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="../manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1E1C18;--panel:#26221C;--panel-2:#2E2A22;--text:#EFE8D8;--muted:#9C9280;--amber:#E3A23A;--amber-dim:#3B2E1A;--line:#433D32;--green:#5FA76E;--green-dim:#1F3325;--rust:#C46A4A;--rust-dim:#3A231B;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;--font-m:"Space Grotesk","Inter",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.wrap{max-width:760px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px}
+.brand .s{font-size:12px;color:var(--muted)}
+h2{font-family:var(--font-m);font-weight:600;font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber-dim);color:var(--amber);font-size:12px;font-weight:600;margin-right:8px;vertical-align:1px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px 10px;font:inherit;font-weight:600;cursor:pointer}
+.seg button.on{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font:inherit;font-size:15px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);text-decoration:none}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn-sm{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amber);background:var(--amber-dim)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--amber);border-color:var(--amber)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+.bar{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .2s}
+.lines{display:grid;gap:10px}
+.line{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.line.ok{border-left-color:var(--green)}
+.line.check{border-left-color:var(--amber)}
+.line.new{border-left-color:#6FA0C8}
+.line.skip{opacity:.55}
+.line .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-word;margin-bottom:6px}
+.line .lrow{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:center}
+.line .unit{font-size:12px;color:var(--muted)}
+.line .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.line .newf{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.line .newf label{margin:0 0 3px}
+.tag{font-size:11px;border-radius:99px;padding:2px 8px;margin-left:6px}
+.tag.ok{background:var(--green-dim);color:var(--green)}.tag.check{background:var(--amber-dim);color:var(--amber)}.tag.new{background:#1C2A36;color:#8FB9DB}
+.sum{position:fixed;left:0;right:0;bottom:0;background:rgba(30,28,24,.96);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+.sum .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{border-top:1px solid var(--line);padding:9px 0;font-size:13px}
+.hist li:first-child{border-top:none}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;z-index:50}
+.toast.show{opacity:1}.toast.err{border-color:var(--rust)}.toast.ok{border-color:var(--green)}
+.empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="../icon-192.png" alt=""><div><div class="t">Stock In</div><div class="s" id="who">Oak Joinery</div></div></div>
+    <a class="btn btn-sm" href="../">☰ Menu</a>
+  </header>
+  <main id="app"><div class="card muted">Loading…</div></main>
+</div>
+<div class="sum hide" id="sum"><div class="in"><div id="sumText" class="small"></div><button class="btn btn-primary" id="commit">Add to stock</button></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../oak-core.js?v=3"></script>
+<script>
+/* Oak Joinery — Stock In helpers (pure functions, no Firebase/DOM).
+ * Turns pasted text, Excel rows, PDF text and OCR text into lines
+ * {code, desc, size, job, material, notes, qty, qtyL, text}, and matches
+ * each line to an item in Board Stock, Consumables or Stock List.
+ * Loaded by stock-in/index.html; also require()-able in node for tests. */
+(function (global) {
+  "use strict";
+
+  // ---------- text helpers ----------
+  function norm(s) {
+    return String(s == null ? "" : s).toLowerCase()
+      .replace(/[×]/g, "x")
+      .replace(/(\d)\s*x\s*(\d)/g, "$1x$2")
+      .replace(/(\d),(\d{3})\b/g, "$1$2")
+      .replace(/[^a-z0-9.x]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+  var SYN = {
+    supawood: "mdf", mdf: "mdf", "m.d.f": "mdf",
+    chipboard: "chip", particleboard: "chip", pb: "chip", chip: "chip",
+    melamine: "mel", mel: "mel", mfc: "mel", mf: "mel",
+    wht: "white", wh: "white", blk: "black",
+    ply: "plywood", plywood: "plywood",
+    pr: "pair", prs: "pair", pairs: "pair",
+    pk: "pack", pkt: "pack", pkts: "pack", packs: "pack",
+    ltr: "l", ltrs: "l", litre: "l", litres: "l", liter: "l", liters: "l",
+    screws: "screw", hinges: "hinge", runners: "runner", handles: "handle"
+  };
+  // Board sheet sizes in mm → the ft names used in Board Stock ("9x6").
+  var SHEET = { "2750x1830": "9x6", "2745x1830": "9x6", "2800x1830": "9x6", "2440x1220": "8x4", "2440x1830": "8x6", "3660x1830": "12x6", "3050x1830": "10x6", "1830x2750": "9x6", "1830x3660": "12x6" };
+  function tokens(s) {
+    var out = [];
+    norm(s).split(" ").forEach(function (t) {
+      if (!t) return;
+      if (SHEET[t]) { out.push(SHEET[t]); return; }
+      var m = t.match(/^(\d+(?:\.\d+)?)(mm|m|l|ml|kg|g|x)$/);
+      if (m) { out.push(m[1]); if (m[2] !== "x") out.push(m[2]); return; }
+      if (SYN[t]) { out.push(SYN[t]); return; }
+      out.push(t);
+    });
+    return out;
+  }
+  function isNum(t) { return /^\d+(\.\d+)?$/.test(t); }
+
+  var STOP = /\b(total|sub ?total|vat|tax|invoice|tel|fax|page|bank|account|acc no|branch|email|e-mail|www|http|reg no|registration|balance|amount due|terms|signature|signed|received by|driver|deliver to|delivery address|order no|date|customer|vat no|thank you|delivery note|credit note|quotation|quote no|purchase order|po no|p\/o)\b/i;
+
+  // Header words → field
+  var HEAD = {
+    code: ["code", "item code", "product code", "stock code", "sku", "part no", "part number", "item no", "article", "ref", "board code"],
+    desc: ["description", "item", "product", "desc", "item description", "product description", "details", "name", "board"],
+    qty: ["qty", "quantity", "qty delivered", "qty supplied", "delivered", "supplied", "qty shipped", "units", "qty r", "qty right", "count", "qty ordered"],
+    qtyL: ["qty l", "qty left", "left"],
+    size: ["size", "dimensions", "dimension"],
+    job: ["job", "category", "cat", "category / job"],
+    material: ["material"],
+    notes: ["notes", "note", "comment", "comments"]
+  };
+  function headField(h) {
+    var n = String(h || "").trim().toLowerCase().replace(/[:.]/g, "").replace(/\s+/g, " ");
+    for (var f in HEAD) if (HEAD[f].indexOf(n) >= 0) return f;
+    return null;
+  }
+
+  function toQty(v) {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    var s = String(v).trim().replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "");
+    var m = s.match(/^-?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+
+  // ---------- table rows (Excel / pasted tab-separated) ----------
+  // rows: array of arrays. Returns lines, or null if no header row found.
+  function linesFromTable(rows) {
+    rows = (rows || []).filter(function (r) { return r && r.some(function (c) { return String(c == null ? "" : c).trim() !== ""; }); });
+    var hi = -1, map = null;
+    for (var i = 0; i < Math.min(rows.length, 15); i++) {
+      var m = {}, hits = 0;
+      rows[i].forEach(function (c, j) { var f = headField(c); if (f && m[f] === undefined) { m[f] = j; hits++; } });
+      if (hits >= 2 && (m.qty !== undefined) && (m.desc !== undefined || m.code !== undefined)) { hi = i; map = m; break; }
+    }
+    if (hi < 0) return null;
+    var out = [];
+    rows.slice(hi + 1).forEach(function (r) {
+      var get = function (f) { return map[f] === undefined ? "" : String(r[map[f]] == null ? "" : r[map[f]]).trim(); };
+      var line = { code: get("code"), desc: get("desc"), size: get("size"), job: get("job"), material: get("material"), notes: get("notes"),
+        qty: toQty(map.qty === undefined ? null : r[map.qty]), qtyL: map.qtyL === undefined ? null : toQty(r[map.qtyL]) };
+      if (!line.code && !line.desc) return;
+      if (STOP.test(line.desc) && !line.code) return;
+      line.text = [line.code, line.desc, line.size].filter(Boolean).join("  ");
+      out.push(line);
+    });
+    return out;
+  }
+
+  // ---------- free text lines (PDF text / OCR / pasted text) ----------
+  function parseTextLine(raw) {
+    var text = String(raw || "").replace(/\t/g, "  ").replace(/[|]/g, " ").trim();
+    if (!text || text.length < 3) return null;
+    if (!/[a-z]/i.test(text) || !/\d/.test(text)) return null;
+    if (STOP.test(text)) return null;
+    var toks = text.split(/\s+/);
+    var info = toks.map(function (t, i) {
+      var clean = t.replace(/^[^\w]+|[^\w.,]+$/g, "");
+      var plainInt = /^\d{1,5}([.,]00?)?$/.test(clean);
+      var price = /^\d{1,3}([ ,]\d{3})*[.,]\d{2}$/.test(clean) && !/[.,]00?$/.test(clean);
+      var money = /^R\d/i.test(t) || /%$/.test(t);
+      var code = /[a-z]/i.test(clean) && /\d/.test(clean) && clean.length >= 3 && clean.length <= 20 && !/^\d+(mm|m|l|ml|kg|g)$/i.test(clean) && !/^\d+x\d+/i.test(clean);
+      return { t: t, clean: clean, i: i, plainInt: plainInt && !money, strictInt: /^\d{1,5}$/.test(clean) && !money, price: price || money, code: code, alpha: /^[a-z][a-z&'/-]*$/i.test(clean) };
+    });
+    var qtyIdx = -1;
+    // "... x 8" or "qty 8" at the end of the line
+    var L = info.length;
+    if (L > 2 && info[L - 1].plainInt && /^(x|qty|qty:)$/i.test(info[L - 2].clean || info[L - 2].t)) qtyIdx = L - 1;
+    // Delivery-note style: "10  CH16  16mm chipboard" — leading number.
+    if (qtyIdx < 0 && info.length > 1 && info[0].plainInt && !info[1].plainInt) qtyIdx = 0;
+    if (qtyIdx < 0) {
+      // Invoice style: CODE DESCRIPTION QTY PRICE ... TOTAL — first plain
+      // integer after some description words, preferring one followed by a price.
+      var UNITW = /^(ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i;
+      var seenWord = false, firstAfter = -1, withPrice = -1, looseFirst = -1;
+      for (var k = 0; k < info.length; k++) {
+        if (info[k].alpha) seenWord = true;
+        if (seenWord && info[k].plainInt && !info[k].strictInt) { if (looseFirst < 0) looseFirst = k; continue; }
+        if (seenWord && info[k].strictInt) {
+          var prev = info[k - 1] && info[k - 1].clean.toLowerCase();
+          var next = info[k + 1] && info[k + 1].clean.toLowerCase();
+          if (next && /^(mm|m|x|ml|l|kg|g|mic|micron)$/.test(next)) continue; // "16 mm"
+          if (prev === "x" || (next === "x")) continue;
+          if (firstAfter < 0) firstAfter = k;
+          var j = k + 1; while (info[j] && UNITW.test(info[j].clean)) j++;
+          var nx = info[j];
+          if (withPrice < 0 && nx && (nx.price || /^R?\d[\d ,]*[.,]\d{2}$/i.test(nx.clean))) withPrice = k;
+        }
+      }
+      qtyIdx = withPrice >= 0 ? withPrice : (firstAfter >= 0 ? firstAfter : looseFirst);
+    }
+    if (qtyIdx < 0) return null;
+    var qty = toQty(info[qtyIdx].clean);
+    if (!qty || qty <= 0 || qty > 100000) return null;
+    var codeTok = info.find(function (x) { return x.i !== qtyIdx && x.code && x.i < (qtyIdx === 0 ? 3 : qtyIdx); });
+    var descEnd = qtyIdx === 0 ? info.length : qtyIdx;
+    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
+      .map(function (x) { return x.t; }).join(" ").replace(/\s+/g, " ").trim();
+    // Drop trailing unit words ("EA", "each") from the description
+    desc = desc.replace(/\s+(ea|each|pcs|pc|no|unit|units|sheets?)$/i, "");
+    if (!desc && !codeTok) return null;
+    return { code: codeTok ? codeTok.clean : "", desc: desc, size: "", job: "", material: "", notes: "", qty: qty, qtyL: null, text: text.replace(/\s{2,}/g, "  ") };
+  }
+
+  function linesFromText(text) {
+    var rows = String(text || "").split(/\r?\n/);
+    // Tab-separated paste with a header row → treat as a table.
+    if (rows.some(function (r) { return r.indexOf("\t") >= 0; })) {
+      var t = linesFromTable(rows.map(function (r) { return r.split("\t"); }));
+      if (t && t.length) return t;
+    }
+    return rows.map(parseTextLine).filter(Boolean);
+  }
+
+  // PDF.js text items → text lines (grouped by y, gaps kept as double spaces).
+  function pdfItemsToText(items) {
+    var rows = [];
+    items.forEach(function (it) {
+      if (!it.str || !it.str.trim()) return;
+      var x = it.transform[4], y = it.transform[5];
+      var row = rows.find(function (r) { return Math.abs(r.y - y) < 3; });
+      if (!row) { row = { y: y, parts: [] }; rows.push(row); }
+      row.parts.push({ x: x, w: it.width || 0, s: it.str });
+    });
+    rows.sort(function (a, b) { return b.y - a.y; });
+    return rows.map(function (r) {
+      r.parts.sort(function (a, b) { return a.x - b.x; });
+      var out = "", end = null;
+      r.parts.forEach(function (p) {
+        if (end !== null) out += (p.x - end > 8 ? "  " : (p.x - end > 1 ? " " : ""));
+        out += p.s; end = p.x + p.w;
+      });
+      return out;
+    }).join("\n");
+  }
+
+  // ---------- matching ----------
+  // items: [{id, label, code, text, job, desc, size}]
+  function aliasKey(line) {
+    var k = norm(line.code) || norm(line.desc + " " + (line.size || ""));
+    return k.replace(/[.#$\[\]\/]/g, "_").slice(0, 120);
+  }
+  function score(lineToks, itemToks) {
+    if (!lineToks.length || !itemToks.length) return 0;
+    var lw = lineToks.filter(function (t) { return !isNum(t); }), iw = itemToks.filter(function (t) { return !isNum(t); });
+    var ln = lineToks.filter(isNum), inum = itemToks.filter(isNum);
+    var inter = iw.filter(function (t) { return lw.indexOf(t) >= 0; }).length;
+    var wordScore = iw.length ? inter / iw.length : 0;
+    var extra = lw.length ? inter / lw.length : 0;
+    if (!inum.length) return wordScore * 0.8 + extra * 0.2; // no numbers to compare on
+    var numScore = 1;
+    if (inum.length) {
+      var hit = inum.filter(function (n) { return ln.indexOf(n) >= 0; }).length;
+      numScore = hit / inum.length;
+      if (hit === 0) return wordScore * 0.25; // 16mm vs 22mm: different item
+    }
+    return wordScore * 0.55 + extra * 0.15 + numScore * 0.30;
+  }
+  // Returns {itemId, how: 'alias'|'code'|'exact'|'fuzzy'|null, score}
+  function matchLine(line, items, aliases) {
+    aliases = aliases || {};
+    var ak = aliasKey(line);
+    if (ak && aliases[ak] && items.some(function (i) { return i.id === aliases[ak].itemId; })) return { itemId: aliases[ak].itemId, how: "alias", score: 1 };
+    var nc = norm(line.code);
+    if (nc) {
+      var byCode = items.find(function (i) { return i.code && norm(i.code) === nc; });
+      if (byCode) return { itemId: byCode.id, how: "code", score: 1 };
+    }
+    // Stock List: same job + item + size
+    if (line.desc) {
+      var nd = norm(line.desc), ns = norm(line.size), nj = norm(line.job);
+      var exact = items.find(function (i) { return i.desc !== undefined && norm(i.desc) === nd && norm(i.size) === ns && (!nj || norm(i.job) === nj); });
+      if (exact) return { itemId: exact.id, how: "exact", score: 1 };
+    }
+    var lt = tokens([line.code, line.desc, line.size].join(" "));
+    var best = null, bestS = 0, second = 0;
+    items.forEach(function (i) {
+      var s = score(lt, i._toks || (i._toks = tokens(i.text)));
+      if (s > bestS) { second = bestS; bestS = s; best = i; } else if (s > second) second = s;
+    });
+    if (best && bestS >= 0.5 && bestS - second > 0.02) return { itemId: best.id, how: "fuzzy", score: bestS };
+    return { itemId: null, how: null, score: bestS };
+  }
+
+  var api = { norm: norm, tokens: tokens, toQty: toQty, linesFromTable: linesFromTable, parseTextLine: parseTextLine,
+    linesFromText: linesFromText, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, score: score };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else global.StockInLib = api;
+})(typeof window !== "undefined" ? window : this);
+
+</script>
+<script>
+(function(){
+"use strict";
+var L = StockInLib, S = OakCore.session, esc = OakCore.esc;
+var core = OakCore.createApp({ appId: "stockIn", readOnly: true });
+var db = null;
+
+var UNITS = { per500:"pack(s)", each:"each", pair:"pair(s)", roll:"roll(s)", tin:"tin(s)" };
+var TARGETS = {
+  board:       { name:"Board Stock", app:"boardStock", addPerm:"boardAddQty", newPerm:"boardAddBoard" },
+  consumables: { name:"Consumables", app:"consumables", addPerm:"consManageItems", newPerm:"consManageItems" },
+  stock:       { name:"Stock List",  app:"stock", addPerm:"stockAddQty", newPerm:"stockAddQty" }
+};
+function perm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
+function allowed(u, key){
+  var t = TARGETS[key]; if(!core.userHasApp(u, t.app)) return false;
+  if(key === "consumables") return perm(u, "consManageItems") || perm(u, "consManageConsumables");
+  return perm(u, t.addPerm);
+}
+
+// ---------- state ----------
+var user = null;
+var D = { board:null, cons:{ items:{}, types:{}, suppliers:{}, meta:{} }, stock:null, aliases:{}, receipts:[] };
+var st = { target:null, loc:"", supplier:"", docRef:"", job:"", tab:"file", lines:[], file:null, busy:false, progress:0, status:"" };
+var seq = 0;
+
+function toast(msg, kind){ var t = document.getElementById("toast"); t.textContent = msg; t.className = "toast show " + (kind||""); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.className = "toast"; }, 3200); }
+function list(v){ return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.keys(v).map(function(k){ return v[k]; }).filter(Boolean) : []); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function fbKey(s){ return String(s).replace(/[.#$\[\]\/]/g, "_"); }
+
+// ---------- items per target ----------
+function locations(){
+  if(st.target === "board") return (D.board && D.board.locations && D.board.locations.length) ? D.board.locations : ["Main"];
+  if(st.target === "consumables") return (D.cons.meta && Array.isArray(D.cons.meta.locations) && D.cons.meta.locations.length) ? D.cons.meta.locations : ["Main"];
+  return [];
+}
+function suppliers(){
+  var src = st.target === "board" ? (D.board && D.board.suppliers) : st.target === "consumables" ? D.cons.suppliers : null;
+  return Object.keys(src || {}).map(function(k){ return { id:k, name:(src[k] && src[k].name) || k }; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+function items(){
+  if(st.target === "board") return list(D.board && D.board.boards).map(function(b){
+    return { id:b.code, code:b.code, label:b.code + " — " + (b.description||"") + (b.category ? " (" + b.category + ")" : ""), text:[b.code,b.description,b.category,b.size].join(" "), unit:b.unit||"EA" }; })
+    .sort(function(a,b){ return a.code.localeCompare(b.code); });
+  if(st.target === "consumables"){
+    var out = [];
+    Object.keys(D.cons.items||{}).forEach(function(id){ var it = D.cons.items[id]; if(!it) return;
+      var name = (it.size||"") + (it.packSize ? " (" + it.packSize + ")" : "");
+      var u = UNITS[it.unit] || "pack(s)";
+      out.push({ id:"s:"+id, code:"s:"+id, kind:"screw", rid:id, label:name + " · " + u, text:[it.size,it.packSize,it.category].join(" "), unit:u }); });
+    Object.keys(D.cons.types||{}).forEach(function(id){ var t = D.cons.types[id]; if(!t) return;
+      if(t.category === "liquid") out.push({ id:"l:"+id, code:"l:"+id, kind:"liquid", rid:id, label:t.name + " · litres", text:t.name, unit:"litres" });
+      else out.push({ id:"u:"+id, code:"u:"+id, kind:"unit", rid:id, label:t.name + " · full containers", text:t.name, unit:"container(s)" }); });
+    return out.sort(function(a,b){ return a.label.localeCompare(b.label); });
+  }
+  if(st.target === "stock") return list(D.stock).map(function(i){
+    return { id:i.id, job:i.cat||"", desc:i.desc||"", size:i.size||"", label:(i.cat ? i.cat + " · " : "") + (i.desc||"") + (i.size ? " " + i.size : ""), text:[i.cat,i.desc,i.size,i.material].join(" "), unit:"" }; })
+    .sort(function(a,b){ return a.label.localeCompare(b.label); });
+  return [];
+}
+function itemById(id){ return items().find(function(i){ return i.id === id; }) || null; }
+function canNew(){ return perm(user, TARGETS[st.target].newPerm); }
+
+// ---------- lines ----------
+function addLines(raw, source){
+  if(!raw || !raw.length){ toast("No stock lines found in that " + source + ".", "err"); return; }
+  var its = items(), al = D.aliases[st.target] || {};
+  var added = 0;
+  raw = raw.filter(function(l){ return (Number(l.qty)||0) > 0 || (Number(l.qtyL)||0) > 0; }); // blank qty = not delivered
+  if(!raw.length){ toast("No lines with a quantity found in that " + source + ".", "err"); return; }
+  raw.forEach(function(l){
+    var m = L.matchLine(l, its, al);
+    var line = { key: ++seq, src: l, qty: Number(l.qty)||0, qtyL: l.qtyL, match: m.itemId || "", how: m.how, score: m.score, nf: null };
+    if(!line.match){
+      if(canNew() && (st.target === "stock" || source === "Excel template")) line.match = "__new";
+    }
+    if(line.match === "__new") line.nf = newFields(l);
+    litres(line);
+    st.lines.push(line); added++;
+  });
+  var got = st.lines.filter(function(x){ return !x.skip && x.match; }).length;
+  toast("Read " + added + " line" + (added===1?"":"s") + " — " + got + " ready. Check them below.", "ok");
+  render();
+}
+// "Lacquer thinners 5L x 4" → 4 tins of 5 L = 20 litres for liquids.
+function litres(line){
+  var it = line.match && itemById(line.match);
+  if(!it || it.kind !== "liquid" || line.volNote) return;
+  var m = String(line.src.text || "").match(/(\d+(?:[.,]\d+)?)\s*(ml|l|lt|ltr|litres?|liters?)\b/i);
+  if(!m) return;
+  var v = parseFloat(m[1].replace(",", ".")); if(/^ml$/i.test(m[2])) v = v / 1000;
+  if(!(v > 0) || !(line.qty > 0)) return;
+  line.volNote = line.qty + " × " + v + " L";
+  line.qty = Math.round(line.qty * v * 100) / 100;
+}
+function newFields(l){
+  if(st.target === "board"){
+    var size = l.size || ((L.tokens(l.desc).find(function(t){ return /^\d+x\d+$/.test(t); })) || "");
+    return { code:(l.code||"").toUpperCase(), description:l.desc||"", category:size, unit:"EA" };
+  }
+  if(st.target === "consumables") return { name:l.desc||l.code||"", unit:"each" };
+  return { job:l.job||st.job||"", desc:l.desc||"", size:l.size||"", material:l.material||"", notes:l.notes||"" };
+}
+
+// ---------- reading files ----------
+function setStatus(msg, pct){ st.status = msg; if(pct !== undefined) st.progress = pct; var s = document.getElementById("status"); if(s){ s.textContent = msg; } var b = document.getElementById("barI"); if(b) b.style.width = Math.round((st.progress||0)*100) + "%"; }
+function loadScript(src){ return new Promise(function(res, rej){ var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function(){ rej(new Error("Could not load " + src)); }; document.head.appendChild(s); }); }
+async function pdfLib(){
+  if(!window.pdfjsLib){ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"); }
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return window.pdfjsLib;
+}
+var ocrWorker = null;
+async function ocr(canvasOrImg, label){
+  if(!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  if(!ocrWorker){
+    setStatus("Getting the text reader ready (first time only)…", 0.05);
+    ocrWorker = await Tesseract.createWorker("eng", 1, {
+      langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+      logger: function(m){ if(m.status === "recognizing text") setStatus("Reading " + label + "… " + Math.round(m.progress*100) + "%", m.progress); }
+    });
+    await ocrWorker.setParameters({ preserve_interword_spaces: "1" });
+  }
+  var r = await ocrWorker.recognize(canvasOrImg);
+  return r.data.text || "";
+}
+function imageToCanvas(file){
+  return new Promise(function(res, rej){
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function(){
+      var max = 2200, sc = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement("canvas"); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      var g = c.getContext("2d"); g.filter = "grayscale(1) contrast(1.25)"; g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("That picture couldn't be opened.")); };
+    img.src = url;
+  });
+}
+async function readFile(file){
+  if(!st.target){ toast("First choose which app the stock is for.", "err"); return; }
+  st.file = file; st.busy = true; render();
+  var name = file.name || "file", lower = name.toLowerCase();
+  try{
+    if(/\.(xlsx|xls|xlsm|csv)$/.test(lower)){
+      setStatus("Reading " + name + "…", 0.3);
+      var wb = XLSX.read(await file.arrayBuffer(), { type:"array" });
+      var raw = [];
+      wb.SheetNames.forEach(function(sn){
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"", raw:true });
+        var t = L.linesFromTable(rows);
+        if(t) raw = raw.concat(t);
+        else raw = raw.concat(L.linesFromText(rows.map(function(r){ return r.join("  "); }).join("\n")));
+      });
+      setStatus("", 1);
+      addLines(raw, isTemplate(wb) ? "Excel template" : "spreadsheet");
+    } else if(/\.pdf$/.test(lower) || file.type === "application/pdf"){
+      setStatus("Opening PDF…", 0.1);
+      var pdfjs = await pdfLib();
+      var pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+      var text = "";
+      for(var p = 1; p <= Math.min(pdf.numPages, 10); p++){
+        var page = await pdf.getPage(p);
+        var tc = await page.getTextContent();
+        text += L.pdfItemsToText(tc.items) + "\n";
+      }
+      if(text.replace(/\s/g, "").length < 40){
+        // Scanned PDF: no text inside, so read the page pictures instead.
+        text = "";
+        for(var q = 1; q <= Math.min(pdf.numPages, 5); q++){
+          var pg = await pdf.getPage(q), vp = pg.getViewport({ scale: 2.2 });
+          var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+          await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+          text += await ocr(c, "page " + q) + "\n";
+        }
+      }
+      setStatus("", 1);
+      addLines(L.linesFromText(text), "PDF");
+    } else if(/^image\//.test(file.type) || /\.(jpe?g|png|heic|webp)$/.test(lower)){
+      var canvas = await imageToCanvas(file);
+      var t2 = await ocr(canvas, "photo");
+      setStatus("", 1);
+      addLines(L.linesFromText(t2), "photo");
+    } else {
+      toast("That file type isn't supported. Use a PDF, photo, Excel or CSV file.", "err");
+    }
+  }catch(e){
+    console.warn(e); toast("Couldn't read that file: " + (e.message || e), "err"); setStatus("");
+  }
+  st.busy = false; render();
+}
+function isTemplate(wb){ try{ var r = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 }); return String((r[0]||[])[0]||"").indexOf("Oak Joinery Stock In") === 0; }catch(e){ return false; } }
+
+// ---------- Excel template ----------
+function downloadTemplate(){
+  var t = st.target, rows, name;
+  var head = ["Oak Joinery Stock In — " + TARGETS[t].name + " template. Fill in Qty (leave blank to skip), then upload this file in Stock In."];
+  if(t === "board"){
+    rows = [head, [], ["Code","Description","Size","Unit","Qty"]].concat(items().map(function(i){ var b = list(D.board.boards).find(function(x){ return x.code === i.id; }) || {}; return [b.code, b.description||"", b.category||"", b.unit||"EA", ""]; }));
+    rows.push(["","New boards: add a row with a new code","","",""]);
+  } else if(t === "consumables"){
+    rows = [head, [], ["Code","Description","Unit","Qty"]].concat(items().map(function(i){ return [i.id, i.label.replace(/ · .*$/, ""), i.unit, ""]; }));
+  } else {
+    rows = [["Oak Joinery Stock In — Stock List (cutting list) template. One row per part. Existing parts in the same job get the Qty added; new parts are created."], [], ["Job","Item","Size","Material","Qty","Qty L","Notes"],
+      [st.job || "Example job","Top","1684 x 568 x 17","White Oak S/F",1,"",""]];
+  }
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = t === "stock" ? [{wch:26},{wch:22},{wch:18},{wch:18},{wch:8},{wch:8},{wch:24}] : [{wch:14},{wch:44},{wch:12},{wch:8},{wch:8}];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stock In");
+  name = "oak-stock-in-" + t + "-template.xlsx";
+  XLSX.writeFile(wb, name);
+}
+
+// ---------- saving ----------
+function readyLines(){ return st.lines.filter(function(l){ return !l.skip && l.match && ((Number(l.qty)||0) > 0 || (Number(l.qtyL)||0) > 0); }); }
+function lineLabel(l){ if(l.match === "__new"){ var n = l.nf||{}; return "NEW " + (n.code || n.name || ((n.job?n.job+" · ":"") + (n.desc||""))); } var i = itemById(l.match); return i ? i.label : l.match; }
+function validateNew(l){
+  var n = l.nf || {};
+  if(st.target === "board"){
+    if(!n.code || !n.description) return "New board needs a code and description.";
+    if(list(D.board && D.board.boards).some(function(b){ return b.code.toLowerCase() === n.code.toLowerCase(); })) return "Board code " + n.code + " already exists — pick it from the list instead.";
+  }
+  if(st.target === "consumables" && !n.name) return "New consumable needs a name.";
+  if(st.target === "stock" && (!n.job || !n.desc)) return "New Stock List part needs a job and an item name.";
+  return null;
+}
+async function uploadDoc(rid){
+  if(!st.file || !firebase.storage) return null;
+  try{
+    var ref = firebase.storage().ref("stockInDocs/" + rid + "-" + st.file.name.replace(/[^\w.\-]+/g, "_"));
+    await ref.put(st.file);
+    return await ref.getDownloadURL();
+  }catch(e){ console.warn("doc upload", e); return null; }
+}
+async function commit(){
+  var lines = readyLines();
+  if(!lines.length){ toast("Nothing to add yet — match some lines and give them a quantity.", "err"); return; }
+  for(var i = 0; i < lines.length; i++){ if(lines[i].match === "__new"){ var e = validateNew(lines[i]); if(e){ toast(e, "err"); return; } } }
+  var fresh = S.resolve(core.getUsers());
+  if(fresh.status !== "ok"){ S.goHome({ next:"stockIn" }); return; }
+  user = fresh.user;
+  var target = st.target, loc = st.loc, who = user.username;
+  var supName = st.supplier ? ((suppliers().find(function(s){ return s.id === st.supplier; })||{}).name || st.supplier) : "";
+  var reason = "Stock In" + (st.docRef ? " " + st.docRef : "") + (supName ? " from " + supName : "") + (loc ? " (" + loc + ")" : "");
+  var rid = uid();
+  if(!confirm("Add " + lines.length + " line" + (lines.length===1?"":"s") + " to " + TARGETS[target].name + (loc ? " at " + loc : "") + "?")) return;
+  st.busy = true; render();
+  var summary = [];
+  try{
+    if(target === "board") await commitBoard(lines, loc, who, reason, summary);
+    else if(target === "consumables") await commitCons(lines, loc, summary);
+    else await commitStock(lines, who, reason, summary);
+    // remember matches for next time
+    var upd = {};
+    lines.forEach(function(l){
+      var id = l.match === "__new" ? l.newId : l.match;
+      var k = L.aliasKey(l.src);
+      if(id && k) upd[fbKey(k)] = { itemId:id, text:String(l.src.text||"").slice(0,160) };
+    });
+    if(Object.keys(upd).length) await db.ref("stockIn/aliases/" + target).update(upd);
+    var fileUrl = await uploadDoc(rid);
+    await db.ref("stockIn/receipts/" + rid).set({ ts:new Date().toISOString(), user:who, target:target, location:loc||"", supplier:supName, docRef:st.docRef||"",
+      fileName: st.file ? st.file.name : "", fileUrl: fileUrl || "", lines: summary });
+    toast("Added " + summary.length + " line" + (summary.length===1?"":"s") + " to " + TARGETS[target].name + ".", "ok");
+    st.lines = []; st.file = null; st.docRef = "";
+  }catch(err){
+    console.warn(err); toast("Couldn't save: " + (err.message || err), "err");
+  }
+  st.busy = false; render();
+}
+async function commitBoard(lines, loc, who, reason, summary){
+  var res = await db.ref("boardStock").transaction(function(cur){
+    if(!cur) return; // not loaded — abort, nothing written
+    cur.boards = list(cur.boards); cur.log = list(cur.log);
+    var locs = (cur.locations && cur.locations.length) ? cur.locations : ["Main"];
+    var ts = new Date().toISOString();
+    lines.forEach(function(l){
+      var q = Math.round(Number(l.qty)||0), b;
+      if(l.match === "__new"){
+        var n = l.nf; b = cur.boards.find(function(x){ return x.code === n.code; });
+        if(!b){ b = { code:n.code, description:n.description, category:n.category||"", unit:n.unit||"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId: st.supplier || "" }; cur.boards.push(b); }
+        l.newId = n.code;
+      } else b = cur.boards.find(function(x){ return x.code === l.match; });
+      if(!b) throw new Error("Board " + l.match + " no longer exists.");
+      if(typeof b.qty === "number"){ var o = {}; o[locs[0]] = b.qty; b.qty = o; }
+      if(!b.qty || typeof b.qty !== "object") b.qty = {};
+      b.qty[loc] = (Number(b.qty[loc])||0) + q;
+      var total = Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0);
+      b.reorderNotified = total <= (Number(b.reorderLevel)||0);
+      cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason });
+    });
+    return cur;
+  });
+  if(!res.committed) throw new Error("Board Stock didn't load — check your connection and try again.");
+  lines.forEach(function(l){ summary.push({ item:lineLabel(l), itemId:l.newId||l.match, qty:Math.round(Number(l.qty)||0), unit:"EA", text:String(l.src.text||"").slice(0,160), isNew:l.match==="__new" }); });
+}
+async function commitCons(lines, loc, summary){
+  var base = "consumablesStock/";
+  for(var i = 0; i < lines.length; i++){
+    var l = lines[i], q = Number(l.qty)||0, it;
+    if(l.match === "__new"){
+      var n = l.nf, nid = uid();
+      await db.ref(base + "screwItems/" + nid).set({ size:n.name, unit:n.unit||"each", qtyByLocation:(function(){ var o={}; o[loc]=Math.round(q); return o; })(), reorderQty:0, reorderSent:false, supplierId: st.supplier || "" });
+      l.newId = "s:" + nid;
+      summary.push({ item:"NEW " + n.name, itemId:l.newId, qty:Math.round(q), unit:UNITS[n.unit]||"each", text:String(l.src.text||"").slice(0,160), isNew:true });
+      continue;
+    }
+    it = itemById(l.match);
+    if(!it) throw new Error("An item was removed while you were working — refresh and try again.");
+    if(it.kind === "screw"){
+      await db.ref(base + "screwItems/" + it.rid + "/qtyByLocation/" + fbKey(loc)).transaction(function(v){ return (Number(v)||0) + Math.round(q); });
+    } else if(it.kind === "liquid"){
+      await db.ref(base + "consumableTypes/" + it.rid + "/volumeByLocation/" + fbKey(loc)).transaction(function(v){ return (Number(v)||0) + Math.round(q*1000); });
+    } else {
+      var n2 = Math.round(q), today = new Date().toISOString().slice(0,10), upd = {};
+      for(var k = 0; k < n2; k++) upd[uid() + k] = { typeId:it.rid, fillLevel:"Full", createdDate:today, location:loc };
+      await db.ref(base + "consumableUnits").update(upd);
+    }
+    summary.push({ item:it.label, itemId:it.id, qty:it.kind === "unit" ? Math.round(q) : (it.kind === "liquid" ? q : Math.round(q)), unit:it.unit, text:String(l.src.text||"").slice(0,160) });
+  }
+}
+async function commitStock(lines, who, reason, summary){
+  var res = await db.ref("stockList/items").transaction(function(cur){
+    var arr = list(cur);
+    lines.forEach(function(l){
+      var q = Math.round(Number(l.qty)||0), qL = (l.qtyL === null || l.qtyL === undefined || l.qtyL === "") ? null : Math.round(Number(l.qtyL)||0), it;
+      if(l.match === "__new"){
+        var n = l.nf;
+        it = arr.find(function(x){ return L.norm(x.cat) === L.norm(n.job) && L.norm(x.desc) === L.norm(n.desc) && L.norm(x.size) === L.norm(n.size); });
+        if(!it){ it = { id:"i" + Date.now() + Math.random().toString(36).slice(2,6), cat:n.job, desc:n.desc, size:n.size||"", material:n.material||"", qty:0, qtyL:null, notes:n.notes||"" }; arr.push(it); }
+        l.newId = it.id;
+      } else it = arr.find(function(x){ return x.id === l.match; });
+      if(!it) throw new Error("A Stock List line was removed while you were working — refresh and try again.");
+      it.qty = (Number(it.qty)||0) + q;
+      if(qL !== null) it.qtyL = (Number(it.qtyL)||0) + qL;
+    });
+    return arr;
+  });
+  if(!res.committed) throw new Error("Stock List didn't save — try again.");
+  await db.ref("stockList/activityLog").transaction(function(cur){
+    var a = list(cur); a.push({ ts:Date.now(), user:who, action:"stockIn", details:{ note:reason, lines:lines.length } });
+    return a.length > 300 ? a.slice(a.length - 300) : a;
+  });
+  lines.forEach(function(l){ summary.push({ item:lineLabel(l), itemId:l.newId||l.match, qty:Math.round(Number(l.qty)||0), qtyL:l.qtyL||null, unit:"", text:String(l.src.text||"").slice(0,160), isNew:l.match==="__new" }); });
+}
+
+// ---------- rendering ----------
+function optList(sel){
+  var o = '<option value="">— Not stock / skip —</option>';
+  if(canNew()) o += '<option value="__new"' + (sel==="__new"?" selected":"") + '>＋ New item…</option>';
+  items().forEach(function(i){ o += '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; });
+  return o;
+}
+function lineState(l){
+  if(l.skip || !l.match) return "skip";
+  if(l.match === "__new") return "new";
+  return (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok";
+}
+function unitFor(l){
+  if(l.match === "__new") return st.target === "board" ? "EA" : st.target === "consumables" ? (UNITS[(l.nf||{}).unit]||"") : "";
+  var i = itemById(l.match); return i ? i.unit : "";
+}
+function newFieldsHtml(l){
+  var n = l.nf || {}, k = l.key;
+  function f(name, lab, val, ph){ return '<div><label>' + lab + '</label><input data-nf="' + k + '" data-f="' + name + '" value="' + esc(val||"") + '" placeholder="' + esc(ph||"") + '"></div>'; }
+  if(st.target === "board") return '<div class="newf">' + f("code","Code",n.code,"e.g. WHM18") + f("description","Description",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + f("unit","Unit",n.unit,"EA") + '</div>';
+  if(st.target === "consumables") return '<div class="newf">' + f("name","Name",n.name,"4x30 chipboard screw") +
+    '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div></div>';
+  return '<div class="newf">' + f("job","Job",n.job,"Wet Bar Right-Handed") + f("desc","Item",n.desc,"Top") + f("size","Size",n.size,"1684 x 568 x 17") + f("material","Material",n.material,"") + '</div>';
+}
+function render(){
+  var root = document.getElementById("app");
+  var targets = Object.keys(TARGETS).filter(function(k){ return allowed(user, k); });
+  if(!targets.length){
+    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">You can\'t add stock to any app yet. Ask Sean to give you "Add stock" in Board Stock, Consumables or Stock List.</p><a class="btn" href="../">Back to menu</a></div>';
+    document.getElementById("sum").classList.add("hide"); return;
+  }
+  if(targets.length === 1 && !st.target) chooseTarget(targets[0], true);
+  var h = "";
+  h += '<div class="card"><h2><span class="step">1</span>Add stock to</h2><div class="seg">' + targets.map(function(k){ return '<button type="button" data-target="' + k + '" class="' + (st.target===k?"on":"") + '">' + TARGETS[k].name + '</button>'; }).join("") + '</div>';
+  if(st.target){
+    h += '<div class="grid2">';
+    if(st.target !== "stock"){
+      h += '<div><label>Location</label><select id="loc">' + locations().map(function(l){ return '<option' + (l===st.loc?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>';
+      var sups = suppliers();
+      h += '<div><label>Supplier (optional)</label><select id="sup"><option value="">—</option>' + sups.map(function(s){ return '<option value="' + esc(s.id) + '"' + (s.id===st.supplier?" selected":"") + '>' + esc(s.name) + '</option>'; }).join("") + '</select></div>';
+    } else {
+      h += '<div><label>Job for new parts (if the sheet has no Job column)</label><input id="job" list="jobs" value="' + esc(st.job) + '" placeholder="e.g. Assembly #16"><datalist id="jobs">' + Array.from(new Set(list(D.stock).map(function(i){ return i.cat; }).filter(Boolean))).map(function(j){ return '<option value="' + esc(j) + '">'; }).join("") + '</datalist></div>';
+    }
+    h += '<div><label>Delivery note / invoice no. (optional)</label><input id="docref" value="' + esc(st.docRef) + '" placeholder="e.g. INV 10136"></div></div>';
+  }
+  h += '</div>';
+
+  if(st.target){
+    h += '<div class="card"><h2><span class="step">2</span>Add the lines</h2>';
+    h += '<div class="tabs">' + [["file","Upload"],["paste","Paste"],["type","Type"]].map(function(t){ return '<button type="button" data-tab="' + t[0] + '" class="' + (st.tab===t[0]?"on":"") + '">' + t[1] + '</button>'; }).join("") + '</div>';
+    if(st.tab === "file"){
+      h += '<div class="drop" id="drop"><div><b>Drop a delivery note, invoice or Excel file here</b></div><div class="small muted">PDF, photo, Excel or CSV</div>' +
+           '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
+           '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
+           '<div class="status" id="status">' + esc(st.status) + '</div><div class="bar' + (st.busy?"":" hide") + '"><i id="barI" style="width:' + Math.round((st.progress||0)*100) + '%"></i></div>' +
+           '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="tpl">⬇ Excel template for ' + esc(TARGETS[st.target].name) + '</button></div>' +
+           '<p class="small muted" style="margin:8px 0 0">Emailed PDF invoices read best. For photos, lay the page flat in good light and fill the frame. The template lists your items already — just type the quantities.</p>';
+    } else if(st.tab === "paste"){
+      h += '<textarea id="pasteIn" placeholder="Copy the rows from Excel (with the header row) or from an emailed invoice and paste them here."></textarea><div class="row" style="margin-top:8px"><button class="btn btn-sm btn-primary" type="button" id="pasteGo">Read pasted lines</button></div>';
+    } else {
+      h += '<div class="row"><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line</button><span class="small muted">Pick the item and type the quantity.</span></div>';
+    }
+    h += '</div>';
+
+    h += '<div class="card"><h2><span class="step">3</span>Check and add</h2>';
+    if(!st.lines.length) h += '<div class="empty">Lines you upload, paste or type show up here for checking before anything is added.</div>';
+    else {
+      h += '<p class="small muted" style="margin-top:0"><span class="tag ok">matched</span> <span class="tag check">please check</span> <span class="tag new">new item</span> Grey lines are skipped. Change the item or quantity if anything is wrong.</p><div class="lines">';
+      st.lines.forEach(function(l){
+        var s = lineState(l);
+        h += '<div class="line ' + s + '" data-key="' + l.key + '">';
+        if(l.src && l.src.text) h += '<div class="src">' + esc(l.src.text) + '</div>';
+        h += '<div class="lrow"><select data-match="' + l.key + '">' + optList(l.match) + '</select>' +
+             '<div><input type="number" inputmode="decimal" min="0" step="any" data-qty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty"><div class="unit">' + esc(unitFor(l)) + (l.volNote ? " (" + esc(l.volNote) + ")" : "") + (st.target==="stock" && l.qtyL ? " · L " + l.qtyL : "") + '</div></div>' +
+             '<button class="x" type="button" title="Remove line" data-del="' + l.key + '">×</button></div>';
+        if(l.match === "__new") h += newFieldsHtml(l);
+        h += '</div>';
+      });
+      h += '</div><div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="clearAll">Clear all</button></div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<div class="card"><h2>Recent stock in</h2>' + (D.receipts.length ? '<ul class="hist">' + D.receipts.slice(0, 15).map(function(r){
+    var d = new Date(r.ts); var ls = list(r.lines);
+    return '<li><b>' + esc(TARGETS[r.target] ? TARGETS[r.target].name : r.target) + '</b>' + (r.location ? " · " + esc(r.location) : "") + ' — ' + ls.length + ' line' + (ls.length===1?"":"s") +
+      (r.docRef ? " · " + esc(r.docRef) : "") + (r.supplier ? " · " + esc(r.supplier) : "") +
+      '<div class="muted">' + esc(r.user) + ' · ' + d.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }) + ' ' + d.toLocaleTimeString("en-ZA", { hour:"2-digit", minute:"2-digit" }) +
+      (r.fileUrl ? ' · <a href="' + esc(r.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">document</a>' : '') + '</div>' +
+      '<div class="muted small">' + ls.slice(0, 6).map(function(x){ return esc(x.qty + (x.unit ? " " + x.unit : "") + " × " + x.item); }).join("<br>") + (ls.length > 6 ? "<br>…" : "") + '</div></li>';
+  }).join("") + '</ul>' : '<div class="empty">Nothing yet.</div>') + '</div>';
+
+  root.innerHTML = h;
+  bind();
+  var ready = readyLines();
+  var sum = document.getElementById("sum");
+  sum.classList.toggle("hide", !st.lines.length);
+  document.getElementById("sumText").innerHTML = '<b>' + ready.length + '</b> of ' + st.lines.length + ' line' + (st.lines.length===1?"":"s") + ' ready' + (st.target ? " → " + esc(TARGETS[st.target].name) + (st.loc ? " · " + esc(st.loc) : "") : "");
+  var cb = document.getElementById("commit"); cb.disabled = st.busy || !ready.length; cb.textContent = st.busy ? "Saving…" : "Add to stock";
+}
+function chooseTarget(k, silent){
+  if(st.target === k) return;
+  if(st.lines.length && !silent && !confirm("Switching app clears the lines below. Carry on?")) return;
+  st.target = k; st.lines = []; st.supplier = "";
+  var locs = locations(); st.loc = locs.indexOf(st.loc) >= 0 ? st.loc : (locs[0] || "");
+  try{ localStorage.setItem("oakStockInTarget", k); }catch(e){}
+  if(!silent) render();
+}
+function lineByKey(k){ return st.lines.find(function(l){ return String(l.key) === String(k); }); }
+function bind(){
+  var q = function(s){ return document.querySelector(s); }, qa = function(s){ return document.querySelectorAll(s); };
+  qa("[data-target]").forEach(function(b){ b.onclick = function(){ chooseTarget(b.getAttribute("data-target")); }; });
+  qa("[data-tab]").forEach(function(b){ b.onclick = function(){ st.tab = b.getAttribute("data-tab"); render(); }; });
+  if(q("#loc")) q("#loc").onchange = function(){ st.loc = this.value; render(); };
+  if(q("#sup")) q("#sup").onchange = function(){ st.supplier = this.value; };
+  if(q("#docref")) q("#docref").oninput = function(){ st.docRef = this.value.trim(); };
+  if(q("#job")) q("#job").oninput = function(){ st.job = this.value.trim(); };
+  var fi = q("#fileIn"), ci = q("#camIn");
+  if(q("#pick")) q("#pick").onclick = function(e){ e.stopPropagation(); fi.click(); };
+  if(q("#snap")) q("#snap").onclick = function(e){ e.stopPropagation(); ci.click(); };
+  if(q("#tpl")) q("#tpl").onclick = downloadTemplate;
+  [fi, ci].forEach(function(inp){ if(inp) inp.onchange = function(){ if(inp.files[0]) readFile(inp.files[0]); inp.value = ""; }; });
+  var dz = q("#drop");
+  if(dz){
+    dz.onclick = function(){ fi.click(); };
+    dz.ondragover = function(e){ e.preventDefault(); dz.classList.add("over"); };
+    dz.ondragleave = function(){ dz.classList.remove("over"); };
+    dz.ondrop = function(e){ e.preventDefault(); dz.classList.remove("over"); var f = e.dataTransfer.files[0]; if(f) readFile(f); };
+  }
+  if(q("#pasteGo")) q("#pasteGo").onclick = function(){ var t = q("#pasteIn").value; addLines(L.linesFromText(t), "pasted text"); };
+  if(q("#addBlank")) q("#addBlank").onclick = function(){ st.lines.push({ key:++seq, src:{ text:"" }, qty:0, match:"", how:null, score:0, nf:null }); render(); };
+  if(q("#clearAll")) q("#clearAll").onclick = function(){ if(confirm("Clear all lines?")){ st.lines = []; render(); } };
+  qa("[data-match]").forEach(function(s){ s.onchange = function(){
+    var l = lineByKey(s.getAttribute("data-match")); l.match = s.value; l.how = "picked"; l.skip = !s.value;
+    litres(l);
+    if(l.match === "__new" && !l.nf) l.nf = newFields(l.src || {});
+    render();
+  }; });
+  qa("[data-qty]").forEach(function(inp){ inp.oninput = function(){
+    var l = lineByKey(inp.getAttribute("data-qty")); l.qty = inp.value === "" ? 0 : Number(inp.value);
+    if(l.qty > 0 && l.match) l.skip = false;
+    var ready = readyLines(); document.getElementById("sumText").querySelector("b").textContent = ready.length; document.getElementById("commit").disabled = !ready.length;
+  }; inp.onchange = function(){ render(); }; });
+  qa("[data-del]").forEach(function(b){ b.onclick = function(){ st.lines = st.lines.filter(function(l){ return String(l.key) !== b.getAttribute("data-del"); }); render(); }; });
+  qa("[data-nf]").forEach(function(inp){ var h = function(){ var l = lineByKey(inp.getAttribute("data-nf")); l.nf = l.nf || {}; l.nf[inp.getAttribute("data-f")] = inp.value.trim(); }; inp.oninput = h; inp.onchange = function(){ h(); if(inp.tagName === "SELECT") render(); }; });
+}
+document.getElementById("commit").onclick = commit;
+
+// ---------- start ----------
+var started = false;
+function start(){
+  if(started) return; started = true;
+  db = firebase.database();
+  db.ref("boardStock").on("value", function(s){ D.board = s.val() || { boards:[], locations:["Main"] }; if(!st.busy) render(); });
+  ["screwItems","consumableTypes","suppliers","meta"].forEach(function(k){
+    db.ref("consumablesStock/" + k).on("value", function(s){ var key = { screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]; D.cons[key] = s.val() || {}; if(!st.busy) render(); });
+  });
+  db.ref("stockList/items").on("value", function(s){ D.stock = s.val() || []; if(!st.busy) render(); });
+  db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
+  db.ref("stockIn/receipts").limitToLast(15).on("value", function(s){ var v = s.val() || {}; D.receipts = Object.keys(v).map(function(k){ return v[k]; }).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); }); if(!st.busy) render(); });
+  var saved = null; try{ saved = localStorage.getItem("oakStockInTarget"); }catch(e){}
+  if(saved && TARGETS[saved] && allowed(user, saved)) chooseTarget(saved, true);
+  render();
+}
+try{
+  core.init();
+  core.startUsersSync(function(users){
+    var r = S.resolve(users);
+    if(r.status === "wait") return;
+    if(r.status !== "ok"){ S.goHome({ next:"stockIn" }); return; }
+    user = r.user;
+    document.getElementById("who").textContent = user.username;
+    start();
+    if(!st.busy) render();
+  });
+}catch(e){
+  document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>';
+}
+if(!S.get()) S.goHome({ next:"stockIn" });
+})();
+</script>
+</body>
+</html>
