@@ -136,7 +136,7 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
   }
   function isNum(t) { return /^\d+(\.\d+)?$/.test(t); }
 
-  var STOP = /\b(total|sub ?total|vat|tax|invoice|tel|fax|page|bank|account|acc no|branch|email|e-mail|www|http|reg no|registration|balance|amount due|terms|signature|signed|received by|driver|deliver to|delivery address|order no|date|customer|vat no|thank you|delivery note|credit note|quotation|quote no|purchase order|po no|p\/o)\b/i;
+  var STOP = /\b(business park|industrial park|exporters|street|avenue|road|drive|postnet|p\.?\s?o\.? box|private bag|suite \d|sales code|sales rep|salesperson|lead time|expires|valid until|att\b|attention|account no|branch code|swift|reference|ref no|your ref|customer no|cust no|order date|printed|telephone|phone|cell|mobile|fax|reg\.? no|co reg|total|sub ?total|vat|tax|invoice|tel|fax|page|bank|account|acc no|branch|email|e-mail|www|http|reg no|registration|balance|amount due|terms|signature|signed|received by|driver|deliver to|delivery address|order no|date|customer|vat no|thank you|delivery note|credit note|quotation|quote no|purchase order|po no|p\/o)\b/i;
 
   // Header words → field
   var HEAD = {
@@ -196,7 +196,7 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     var toks = text.split(/\s+/);
     var info = toks.map(function (t, i) {
       var clean = t.replace(/^[^\w]+|[^\w.,]+$/g, "");
-      var plainInt = /^\d{1,5}([.,]00?)?$/.test(clean);
+      var plainInt = /^\d{1,5}([.,]0{1,3})?$/.test(clean);
       var price = /^\d{1,3}([ ,]\d{3})*[.,]\d{2}$/.test(clean) && !/[.,]00?$/.test(clean);
       var money = /^R\d/i.test(t) || /%$/.test(t);
       var code = /[a-z]/i.test(clean) && /\d/.test(clean) && clean.length >= 3 && clean.length <= 20 && !/^\d+(mm|m|l|ml|kg|g)$/i.test(clean) && !/^\d+x\d+/i.test(clean);
@@ -211,11 +211,16 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     if (qtyIdx < 0) {
       // Invoice style: CODE DESCRIPTION QTY PRICE ... TOTAL — first plain
       // integer after some description words, preferring one followed by a price.
-      var UNITW = /^(ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i;
+      var UNITW = /^(thd|th|ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i;
       var seenWord = false, firstAfter = -1, withPrice = -1, looseFirst = -1;
       for (var k = 0; k < info.length; k++) {
         if (info[k].alpha) seenWord = true;
-        if (seenWord && info[k].plainInt && !info[k].strictInt) { if (looseFirst < 0) looseFirst = k; continue; }
+        if (seenWord && info[k].plainInt && !info[k].strictInt) {
+          if (looseFirst < 0) looseFirst = k;
+          var jj = k + 1; while (info[jj] && /^(thd|th|ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i.test(info[jj].clean)) jj++;
+          if (withPrice < 0 && info[jj] && (info[jj].price || /^R?\d[\d ,]*[.,]\d{2}$/i.test(info[jj].clean))) withPrice = k;
+          continue;
+        }
         if (seenWord && info[k].strictInt) {
           var prev = info[k - 1] && info[k - 1].clean.toLowerCase();
           var next = info[k + 1] && info[k + 1].clean.toLowerCase();
@@ -227,6 +232,8 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
           if (withPrice < 0 && nx && (nx.price || /^R?\d[\d ,]*[.,]\d{2}$/i.test(nx.clean))) withPrice = k;
         }
       }
+      if (firstAfter >= 0 && looseFirst >= 0 && looseFirst < firstAfter && toQty(info[firstAfter].clean) >= 1000) firstAfter = -1;
+      if (withPrice >= 0 && looseFirst >= 0 && looseFirst < withPrice && toQty(info[withPrice].clean) >= 1000) withPrice = looseFirst;
       qtyIdx = withPrice >= 0 ? withPrice : (firstAfter >= 0 ? firstAfter : looseFirst);
     }
     if (qtyIdx < 0) return null;
@@ -239,7 +246,25 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     // Drop trailing unit words ("EA", "each") from the description
     desc = desc.replace(/\s+(ea|each|pcs|pc|no|unit|units|sheets?)$/i, "");
     if (!desc && !codeTok) return null;
+    // OCR noise ("i Lo a J 4 ie"): need real words
+    var words = (desc.match(/[A-Za-z]{3,}/g) || []);
+    if (!words.length || (!codeTok && words.length < 2 && !/[A-Za-z]{5,}/.test(desc))) return null;
     return { code: codeTok ? codeTok.clean : "", desc: desc, size: "", job: "", material: "", notes: "", qty: qty, qtyL: null, text: text.replace(/\s{2,}/g, "  ") };
+  }
+
+  // Invoices/quotes: only read the item table — the lines after the column
+  // header row ("Code  Description  Qty ...") up to the totals/footer.
+  var HEADROW = /\b(qty|quantity|qnty|units?)\b/i, HEADDESC = /\b(description|desc|item|product|details)\b/i;
+  var FOOT = /\b(total item|net value|sub ?total|total excl|total incl|total vat|vat total|amount due|balance due|terms and conditions|terms of|banking details|deliver to|delivery address|received by|thank you)\b/i;
+  function linesFromDoc(text) {
+    var rows = String(text || "").split(/\r?\n/);
+    var out = [], inTable = false, found = false;
+    rows.forEach(function (r) {
+      if (!inTable && HEADROW.test(r) && HEADDESC.test(r) && !/\d{3,}/.test(r)) { inTable = true; found = true; return; }
+      if (inTable && FOOT.test(r)) { inTable = false; return; }
+      if (inTable) { var l = parseTextLine(r); if (l) out.push(l); }
+    });
+    return found && out.length ? out : linesFromText(text);
   }
 
   function linesFromText(text) {
@@ -274,10 +299,82 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     }).join("\n");
   }
 
+  // PDF.js items of ONE page → item-table lines using the column header's
+  // x-positions (Code | Description | Qty | Unit | Price ...). Returns [] if
+  // the page has no recognisable item table.
+  function pdfTable(items) {
+    var rows = [];
+    items.forEach(function (it) {
+      if (!it.str || !it.str.trim()) return;
+      var x = it.transform[4], y = it.transform[5];
+      var row = rows.find(function (r) { return Math.abs(r.y - y) < 3; });
+      if (!row) { row = { y: y, parts: [] }; rows.push(row); }
+      row.parts.push({ x: x, w: it.width || 0, s: it.str.trim().replace(/\u019f|\u01a0|\u01ac|\u0187/g, "ti").replace(/\ufb01/g, "fi").replace(/\ufb02/g, "fl") });
+    });
+    rows.sort(function (a, b) { return b.y - a.y; });
+    rows.forEach(function (r) { r.parts.sort(function (a, b) { return a.x - b.x; }); r.text = r.parts.map(function (p) { return p.s; }).join(" "); });
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!(HEADROW.test(r.text) && HEADDESC.test(r.text)) || /\d{3,}/.test(r.text)) continue;
+      // header columns (split multi-word header items on 2+ spaces is not needed: pdf.js gives runs)
+      var cols = r.parts.map(function (p) { return { x: p.x, c: p.x + p.w / 2, label: p.s.toLowerCase() }; });
+      var find = function (re) { var c = cols.findIndex(function (c) { return re.test(c.label); }); return c; };
+      var qi = find(/\b(qty|quantity|qnty|units?)\b/);
+      var di = find(/\b(description|desc)\b/);
+      if (di < 0) di = find(/\b(item|product|details)\b/);
+      var ci = find(/\b(code|sku|part|item no|item code|product code|stock code|article)\b/);
+      if (ci < 0) { var alt = find(/^(item|product)$/); if (alt >= 0 && alt !== di) ci = alt; }
+      var ui = find(/^unit$|^uom$|^u\/m$/);
+      if (qi < 0 || di < 0) continue;
+      // each value goes to the header column whose centre is nearest (handles
+      // left-, centre- and right-aligned columns); long text that starts inside
+      // a column stays in that column.
+      var colOf = function (p) {
+        var mid = p.x + p.w / 2, best = 0, bd = 1e9;
+        for (var c = 0; c < cols.length; c++) { var d = Math.abs(cols[c].c - mid); if (d < bd) { bd = d; best = c; } }
+        return best;
+      };
+      var last = null;
+      for (var j = i + 1; j < rows.length; j++) {
+        var rr = rows[j];
+        if (FOOT.test(rr.text) || (HEADROW.test(rr.text) && HEADDESC.test(rr.text) && !/\d{3,}/.test(rr.text))) break;
+        var cells = cols.map(function () { return []; });
+        rr.parts.forEach(function (p) { cells[colOf(p)].push(p.s); });
+        var cell = function (k) { return k < 0 ? "" : cells[k].join(" ").trim(); };
+        var qtxt = cell(qi), desc = cell(di), code = cell(ci), unit = cell(ui);
+        // quantity printed slightly off its header ("5000 Each" under Unit)
+        if (!qtxt) [qi + 1, qi - 1].forEach(function (k) { var t = cell(k); if (!qtxt && k !== di && k !== ci && /^\d[\d ,]*(\.\d+)?(\s+[a-z\/]+)?$/i.test(t) && !/^R/i.test(t)) { qtxt = t; if (k === ui) unit = ""; } });
+        if (/^(sub ?total|total|vat|tax|discount|net value)\b/i.test(desc) || /^(sub ?total|total|vat|tax)\b/i.test(code)) break;
+        // code and description printed as one run ("BO0001 IMPACT POZI ...")
+        if (code && !desc && /\s/.test(code)) { desc = code.replace(/^\S+\s+/, ""); code = code.split(/\s+/)[0]; }
+        var qm = qtxt.match(/-?\d[\d ,]*(\.\d+)?/);
+        var q = qm ? toQty(qm[0].replace(/ /g, "")) : null;
+        if (!q) {
+          // continuation line of the previous description ("Tapper BZ", "runner")
+          var others = cells.filter(function (c, k) { return k !== di && c.length; }).length;
+          if (last && desc && !others && !/\d/.test(desc) && desc.length < 40 && !/\b(supplier|stock|deliver|delivered|urgent|will|please|note|att|attention|boks|boksburg|anderbolt|road)\b/i.test(desc)) { last.desc += " " + desc; last.text += " " + desc; }
+          continue;
+        }
+        if (!unit) { var um = qtxt.match(/[a-z]+/i); if (um) unit = um[0]; }
+        if (!code) { var m = desc.match(/^([A-Za-z0-9.\/-]{2,20})\s+-\s+(.*)$/); if (m) { code = m[1]; desc = m[2]; } }
+        if (!code && /^\S{12,}\s/.test(desc) && /[\/\d]/.test(desc.split(/\s/)[0])) { code = desc.split(/\s+/)[0]; desc = desc.replace(/^\S+\s+/, ""); }
+        if (code && !/\d/.test(code)) code = "";
+        if (!desc && !code) continue;
+        if (/^(b\/n|batch|lot)\b/i.test(desc)) continue;
+        desc = desc.replace(/^ITEM\/\S+\s+/, "");
+        last = { code: code, desc: desc, size: "", job: "", material: "", notes: "", qty: q, qtyL: null, unit: unit || "", text: rr.text };
+        out.push(last);
+      }
+      break;
+    }
+    return out;
+  }
+
   // ---------- matching ----------
   // items: [{id, label, code, text, job, desc, size}]
   function aliasKey(line) {
-    var k = norm(line.code) || norm(line.desc + " " + (line.size || ""));
+    var k = norm([line.code, line.desc, line.size].filter(Boolean).join(" "));
     return k.replace(/[.#$\[\]\/]/g, "_").slice(0, 120);
   }
   function score(lineToks, itemToks) {
@@ -297,10 +394,15 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     return wordScore * 0.55 + extra * 0.15 + numScore * 0.30;
   }
   // Returns {itemId, how: 'alias'|'code'|'exact'|'fuzzy'|null, score}
-  function matchLine(line, items, aliases) {
-    aliases = aliases || {};
-    var ak = aliasKey(line);
-    if (ak && aliases[ak] && items.some(function (i) { return i.id === aliases[ak].itemId; })) return { itemId: aliases[ak].itemId, how: "alias", score: 1 };
+  function codeKey(line) { var c = norm(line.code); return c ? ("code " + c).replace(/[.#$\[\]\/]/g, "_").slice(0, 120) : ""; }
+  // opts.codeUnique: this line's supplier code appears only once in the document
+  // (so a generic code like Jamac's "BO0001" is never used on its own).
+  function matchLine(line, items, aliases, opts) {
+    aliases = aliases || {}; opts = opts || {};
+    var has = function (k) { return k && aliases[k] && items.some(function (i) { return i.id === aliases[k].itemId; }); };
+    var ak = aliasKey(line), ck = codeKey(line);
+    if (has(ak)) return { itemId: aliases[ak].itemId, how: "alias", score: 1 };
+    if (opts.codeUnique && has(ck)) return { itemId: aliases[ck].itemId, how: "alias", score: 1 };
     var nc = norm(line.code);
     if (nc) {
       var byCode = items.find(function (i) { return i.code && norm(i.code) === nc; });
@@ -323,7 +425,7 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
   }
 
   var api = { norm: norm, tokens: tokens, toQty: toQty, linesFromTable: linesFromTable, parseTextLine: parseTextLine,
-    linesFromText: linesFromText, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, score: score };
+    linesFromText: linesFromText, linesFromDoc: linesFromDoc, pdfTable: pdfTable, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, codeKey: codeKey, score: score };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else global.StockInLib = api;
 })(typeof window !== "undefined" ? window : this);
@@ -400,11 +502,15 @@ function addLines(raw, source){
   var added = 0;
   raw = raw.filter(function(l){ return (Number(l.qty)||0) > 0 || (Number(l.qtyL)||0) > 0; }); // blank qty = not delivered
   if(!raw.length){ toast("No lines with a quantity found in that " + source + ".", "err"); return; }
+  var codeCount = {};
+  raw.forEach(function(l){ var c = L.norm(l.code); if(c) codeCount[c] = (codeCount[c]||0) + 1; });
   raw.forEach(function(l){
-    var m = L.matchLine(l, its, al);
+    var m = L.matchLine(l, its, al, { codeUnique: L.norm(l.code) && codeCount[L.norm(l.code)] === 1 });
     var line = { key: ++seq, src: l, qty: Number(l.qty)||0, qtyL: l.qtyL, match: m.itemId || "", how: m.how, score: m.score, nf: null };
     if(!line.match){
-      if(canNew() && (st.target === "stock" || source === "Excel template")) line.match = "__new";
+      // Consumables and Stock List: an unknown line becomes a new item (blue) to check;
+      // Board Stock: left for you to pick, since new boards need a proper code.
+      if(canNew() && (st.target !== "board" || source === "Excel template")) line.match = "__new";
     }
     if(line.match === "__new") line.nf = newFields(l);
     litres(line);
@@ -430,7 +536,14 @@ function newFields(l){
     var size = l.size || ((L.tokens(l.desc).find(function(t){ return /^\d+x\d+$/.test(t); })) || "");
     return { code:(l.code||"").toUpperCase(), description:l.desc||"", category:size, unit:"EA" };
   }
-  if(st.target === "consumables") return { name:l.desc||l.code||"", unit:"each" };
+  if(st.target === "consumables"){
+    var u = String((l.unit || "") + " " + (l.desc || "")).toLowerCase(), unit = "each";
+    if(/\b(pairs?|pr|prs)\b/.test(u)) unit = "pair";
+    else if(/\b(rolls?)\b/.test(u)) unit = "roll";
+    else if(/\b(tins?)\b/.test(u)) unit = "tin";
+    else if(/\b(box|boxes|pack|packs|pk|pkt|pkts)\b/.test(u)) unit = "per500";
+    return { name:(l.desc||l.code||"").replace(/\s+/g, " ").trim(), unit:unit };
+  }
   return { job:l.job||st.job||"", desc:l.desc||"", size:l.size||"", material:l.material||"", notes:l.notes||"" };
 }
 
@@ -490,11 +603,12 @@ async function readFile(file){
       setStatus("Opening PDF…", 0.1);
       var pdfjs = await pdfLib();
       var pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-      var text = "";
+      var text = "", table = [];
       for(var p = 1; p <= Math.min(pdf.numPages, 10); p++){
         var page = await pdf.getPage(p);
         var tc = await page.getTextContent();
         text += L.pdfItemsToText(tc.items) + "\n";
+        table = table.concat(L.pdfTable(tc.items));   // read the item table by its columns
       }
       if(text.replace(/\s/g, "").length < 40){
         // Scanned PDF: no text inside, so read the page pictures instead.
@@ -507,12 +621,12 @@ async function readFile(file){
         }
       }
       setStatus("", 1);
-      addLines(L.linesFromText(text), "PDF");
+      addLines(table.length ? table : L.linesFromDoc(text), "PDF");
     } else if(/^image\//.test(file.type) || /\.(jpe?g|png|heic|webp)$/.test(lower)){
       var canvas = await imageToCanvas(file);
       var t2 = await ocr(canvas, "photo");
       setStatus("", 1);
-      addLines(L.linesFromText(t2), "photo");
+      addLines(L.linesFromDoc(t2), "photo");
     } else {
       toast("That file type isn't supported. Use a PDF, photo, Excel or CSV file.", "err");
     }
@@ -582,12 +696,14 @@ async function commit(){
     if(target === "board") await commitBoard(lines, loc, who, reason, summary);
     else if(target === "consumables") await commitCons(lines, loc, summary);
     else await commitStock(lines, who, reason, summary);
-    // remember matches for next time
-    var upd = {};
+    // remember matches for next time (by full wording, and by supplier code when it's unique)
+    var upd = {}, codeSeen = {};
+    st.lines.forEach(function(l){ var c = L.norm(l.src && l.src.code); if(c) codeSeen[c] = (codeSeen[c]||0) + 1; });
     lines.forEach(function(l){
       var id = l.match === "__new" ? l.newId : l.match;
-      var k = L.aliasKey(l.src);
+      var k = L.aliasKey(l.src), ck = L.codeKey(l.src);
       if(id && k) upd[fbKey(k)] = { itemId:id, text:String(l.src.text||"").slice(0,160) };
+      if(id && ck && codeSeen[L.norm(l.src.code)] === 1) upd[fbKey(ck)] = { itemId:id, text:String(l.src.text||"").slice(0,160) };
     });
     if(Object.keys(upd).length) await db.ref("stockIn/aliases/" + target).update(upd);
     var fileUrl = await uploadDoc(rid);
