@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery — log in once and open the apps you use.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Oak Joinery">
+<title>Oak Joinery</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1E1C18; --panel:#26221C; --panel-2:#2E2A22; --text:#EFE8D8; --muted:#9C9280;
+  --amber:#E3A23A; --amber-dim:#3B2E1A; --line:#433D32; --green:#5FA76E; --rust:#C46A4A;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif; --font-m:"Space Grotesk","Inter",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:calc(18px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
+.wrap{max-width:520px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:36px;height:36px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px;letter-spacing:.02em}
+.brand .s{font-size:12px;color:var(--muted)}
+.net{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.net i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.net.off i{background:var(--rust)}
+h2{font-family:var(--font-m);font-weight:600;font-size:20px;margin:0 0 6px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.users{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.users button{width:100%;text-align:left;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:14px 14px;font:inherit;font-size:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.users button:hover,.users button:focus-visible{border-color:var(--amber);outline:none}
+.users .last{border-color:var(--amber-dim)}
+.tag{font-size:11px;color:var(--amber);background:var(--amber-dim);border-radius:99px;padding:2px 8px;white-space:nowrap}
+label{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px}
+input[type=password]{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:14px;font-size:22px;letter-spacing:.3em;text-align:center}
+input[type=password]:focus{outline:none;border-color:var(--amber)}
+.err{color:var(--rust);min-height:20px;margin:8px 0 0;font-size:14px}
+.actions{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;border-radius:8px;padding:13px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text)}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn:disabled{opacity:.5;cursor:default}
+.hello{margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{display:flex;flex-direction:column;justify-content:flex-start;min-height:132px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;color:var(--text);text-decoration:none;transition:border-color .15s,transform .05s}
+.tile:hover,.tile:focus-visible{border-color:var(--amber);outline:none}
+.tile:active{transform:scale(.98)}
+.tile .ic{width:40px;height:40px;border-radius:10px;background:var(--amber-dim);display:grid;place-items:center}
+.tile .ic svg{width:22px;height:22px;stroke:var(--amber);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tile .n{font-family:var(--font-m);font-weight:600;font-size:17px;margin-top:14px}
+.tile .d{font-size:12px;color:var(--muted);margin-top:2px}
+.none{padding:18px;text-align:center}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:22px;font-size:12px;color:var(--muted)}
+.link{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:6px 0}
+.hint{margin-top:16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+@media (max-width:360px){.tiles{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="icon-192.png" alt=""><div><div class="t">OAK JOINERY</div><div class="s">Kramerville</div></div></div>
+    <div class="net" id="net"><i></i><span>Online</span></div>
+  </header>
+  <main id="app"><div class="card muted">Loading team…</div></main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="oak-core.js?v=3"></script>
+<script>
+(function(){
+  "use strict";
+  var esc = OakCore.esc;
+  // Home only reads the team list. It never writes to Firebase.
+  var core = OakCore.createApp({ appId: "home", readOnly: true });
+
+  var APPS = [
+    { id:"dispatch",    name:"Dispatch",    desc:"Board & deliveries", url:"/Dispatch-App/",
+      icon:'<path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>' },
+    { id:"stock",       name:"Stock List",  desc:"Cut & assembled parts", url:"/Oak-Stock-List/",
+      icon:'<path d="M4 6h16M4 12h16M4 18h10"/>' },
+    { id:"boardStock",  name:"Board Stock", desc:"Board take & reorders", url:"/Board-Stock-Take/",
+      icon:'<rect x="4" y="4" width="16" height="5" rx="1"/><rect x="4" y="10.5" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="3" rx="1"/>' },
+    { id:"consumables", name:"Consumables", desc:"Fixings & finishing", url:"/Consumables-Stock-Take/",
+      icon:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' }
+  ];
+
+  var LAST_KEY = "oakHomeLastUser";
+  var S = OakCore.session;   // shared by all four apps: log in here once
+  var params = new URLSearchParams(location.search);
+  var nextApp = params.get("next");
+  var deniedApp = params.get("denied");
+  if (params.get("logout")) S.clear();
+  if (params.toString()) history.replaceState(null, "", location.pathname);
+  function appById(id){ return APPS.find(function(a){ return a.id === id; }) || null; }
+  function openApp(a){ location.href = a.url; }
+  var notice = deniedApp && appById(deniedApp) ? "You don't have access to " + appById(deniedApp).name + ". Ask Sean if you need it." : "";
+
+  function store(k, v){ try{ if(v===null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+
+  var view = "boot", pickId = null, err = "", busy = false, user = null;
+  var fails = 0, lockedUntil = 0;
+
+  function findUser(id){ return core.getUsers().find(function(u){ return u && u.id === id; }) || null; }
+  function allowedApps(u){ return APPS.filter(function(a){ return core.userHasApp(u, a.id); }); }
+
+  function restore(){
+    var r = S.resolve(core.getUsers());
+    if(r.status !== "ok") return false;
+    user = r.user; view = "home";
+    goNext();
+    return true;
+  }
+  // Came here from an app (?next=stock): go straight back once logged in.
+  function goNext(){
+    if(!nextApp || !user) return false;
+    var a = appById(nextApp); nextApp = null;
+    if(a && core.userHasApp(user, a.id)){ openApp(a); return true; }
+    if(a) notice = "You don't have access to " + a.name + ". Ask Sean if you need it.";
+    return false;
+  }
+
+  async function doLogin(){
+    if(busy) return;
+    if(Date.now() < lockedUntil){ err = "Too many wrong PINs. Wait " + Math.ceil((lockedUntil-Date.now())/1000) + " seconds."; render(); return; }
+    var pin = (document.getElementById("pin")||{}).value || "";
+    if(!pin){ err = "Enter your PIN."; render(); return; }
+    busy = true; err = ""; render(true);
+    try{
+      var u = findUser(pickId);
+      if(!u) throw new Error("User not found. Go back and pick again.");
+      var ok = await core.verifyPin(u, pin);
+      if(!ok){
+        fails++;
+        if(fails >= 5){ lockedUntil = Date.now() + 30000; fails = 0; throw new Error("Too many wrong PINs. Wait 30 seconds."); }
+        throw new Error("Incorrect PIN.");
+      }
+      fails = 0; user = u; view = "home";
+      S.set(u);
+      store(LAST_KEY, u.id);
+      if(goNext()){ busy = false; return; }
+    }catch(e){ err = e && e.message ? e.message : "Login failed."; }
+    busy = false; render();
+  }
+
+  function logout(){ S.clear(); notice = ""; user = null; pickId = null; err = ""; view = "pick"; render(); }
+
+  function render(keepPin){
+    var root = document.getElementById("app");
+    if(view === "boot"){ root.innerHTML = '<div class="card muted">Loading team…</div>'; return; }
+
+    if(view === "pick"){
+      var last = load(LAST_KEY);
+      var list = core.getUsers().filter(function(u){ return u && u.username; })
+        .sort(function(a,b){ return String(a.username).localeCompare(String(b.username), "en"); });
+      var lastU = list.find(function(u){ return u.id === last; });
+      if(lastU) list = [lastU].concat(list.filter(function(u){ return u !== lastU; }));
+      var h = '<div class="card"><h2>Who\'s this?</h2><p class="muted small">Pick your name, then enter your PIN.</p>';
+      if(!list.length) h += '<p class="err">Couldn\'t load the team list. Check your connection and reload.</p>';
+      else {
+        h += '<ul class="users">';
+        list.forEach(function(u){
+          var tag = u === lastU ? '<span class="tag">Last used</span>' : "";
+          h += '<li><button type="button" class="' + (u===lastU?"last":"") + '" data-id="' + esc(u.id) + '"><span>' + esc(u.username) + '</span>' + tag + '</button></li>';
+        });
+        h += '</ul>';
+      }
+      h += '</div>';
+      root.innerHTML = h;
+      root.querySelectorAll(".users button").forEach(function(b){
+        b.addEventListener("click", function(){ pickId = b.getAttribute("data-id"); err = ""; view = "pin"; render(); });
+      });
+      return;
+    }
+
+    if(view === "pin"){
+      var u = findUser(pickId);
+      var prev = keepPin && document.getElementById("pin") ? document.getElementById("pin").value : "";
+      root.innerHTML =
+        '<div class="card"><h2>Hi ' + esc(u ? u.username : "") + '</h2>' +
+        '<label for="pin">PIN</label>' +
+        '<input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="••••">' +
+        '<p class="err">' + esc(err) + '</p>' +
+        '<div class="actions"><button class="btn" id="back" type="button">Back</button>' +
+        '<button class="btn btn-primary" id="go" type="button"' + (busy?" disabled":"") + '>' + (busy?"Checking…":"Log in") + '</button></div></div>';
+      var p = document.getElementById("pin"); p.value = prev; if(!busy) p.focus();
+      p.addEventListener("keydown", function(e){ if(e.key === "Enter") doLogin(); });
+      document.getElementById("go").addEventListener("click", doLogin);
+      document.getElementById("back").addEventListener("click", function(){ view = "pick"; err = ""; render(); });
+      return;
+    }
+
+    if(view === "home" && user){
+      var apps = allowedApps(user);
+      var hr = new Date().getHours();
+      var greet = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+      var h = '<div class="hello"><h2>' + greet + ', ' + esc(user.username) + '</h2><p class="muted small">Tap an app to open it.</p></div>';
+      if(notice) h += '<div class="card" style="border-color:var(--rust);margin-bottom:12px">' + esc(notice) + '</div>';
+      if(!apps.length){
+        h += '<div class="card none"><p>You don\'t have any apps yet.</p><p class="muted small">Ask Sean to tick the apps you need in your user settings.</p></div>';
+      } else {
+        h += '<div class="tiles">';
+        apps.forEach(function(a){
+          h += '<a class="tile" href="' + a.url + '"><div class="ic"><svg viewBox="0 0 24 24">' + a.icon + '</svg></div>' +
+               '<div><div class="n">' + esc(a.name) + '</div><div class="d">' + esc(a.desc) + '</div></div></a>';
+        });
+        h += '</div>';
+      }
+      h += '<div class="foot"><span>oak-core ' + esc(OakCore.VERSION) + '</span><button class="link" id="out" type="button">Log out</button></div>';
+      root.innerHTML = h;
+      document.getElementById("out").addEventListener("click", logout);
+    }
+  }
+
+  // Keep the signed-in user up to date if Sean changes their apps.
+  function onUsers(){
+    if(view === "boot"){ if(!restore()) view = "pick"; render(); return; }
+    if(view === "pick") { render(); return; }
+    if(view === "home" && user){
+      var fresh = findUser(user.id);
+      if(!fresh || S.resolve(core.getUsers()).status !== "ok"){ logout(); return; }
+      user = fresh; render();
+    }
+  }
+
+  function net(){
+    var el = document.getElementById("net");
+    var on = navigator.onLine;
+    el.classList.toggle("off", !on);
+    el.querySelector("span").textContent = on ? "Online" : "Offline";
+  }
+  window.addEventListener("online", net); window.addEventListener("offline", net); net();
+
+  try{
+    core.init();
+    core.startUsersSync(onUsers);
+    setTimeout(function(){ if(view === "boot"){ view = "pick"; render(); } }, 8000);
+  }catch(e){
+    document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="err">' + esc(e.message || String(e)) + '</p></div>';
+  }
+
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(function(){}); }
+})();
+</script>
+</body>
+</html>

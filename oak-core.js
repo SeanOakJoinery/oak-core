@@ -12,6 +12,13 @@
  * saving its board) can't undo each other. Same function names as v1, so
  * apps don't need changing.
  *
+ * v3 (2026-09-25): ONE LOGIN for all apps. OakCore.session keeps who is
+ * logged in on this device (all apps live on seanoakjoinery.github.io, so
+ * they share it). The Oak Joinery home app (/oak-core/) is the only login
+ * screen; each app picks up the session, and its "Menu" button goes back
+ * home. The session stores the user id + PIN hash, so changing a PIN or
+ * deleting a user ends it everywhere. Expires after 12 hours.
+ *
  * Usage:
  *   var core = OakCore.createApp({ appId: "boardStock", readOnly: true });
  *   core.init();
@@ -20,7 +27,7 @@
 (function (global) {
   "use strict";
 
-  var VERSION = "2";
+  var VERSION = "3";
 
   var FIREBASE_CONFIG = {
     apiKey: "AIzaSyCkoUkLIlxdxD2AAEpLGW4dzqkSeC5lVh0",
@@ -89,6 +96,61 @@
     });
     return out;
   }
+
+
+  // ---------------- v3: shared session (one login for every app) ----------------
+  var SESSION_KEY = "oakSession";
+  var SESSION_HOURS = 12;
+  var HOME_URL = "/oak-core/";
+  function lsGet(k) { try { return JSON.parse(global.localStorage.getItem(k)); } catch (e) { return null; } }
+  function lsSet(k, v) { try { if (v == null) global.localStorage.removeItem(k); else global.localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function mainRootOf(list) {
+    list = asList(list);
+    return list.find(function (u) { return u && u.isMainRoot; }) || list.find(function (u) { return u && u.isRoot; }) || null;
+  }
+  function listHasApp(list, u, appId) {
+    if (!u) return false;
+    var mr = mainRootOf(list);
+    if (mr && mr.id === u.id) return true;
+    if (!u.apps) return true; // legacy account — not yet scoped
+    return !!u.apps[appId];
+  }
+  var session = {
+    HOME_URL: HOME_URL,
+    get: function () {
+      var s = lsGet(SESSION_KEY);
+      if (!s || !s.id || !s.exp || Date.now() > s.exp) { if (s) lsSet(SESSION_KEY, null); return null; }
+      return s;
+    },
+    set: function (u) {
+      if (!u || !u.id) return;
+      lsSet(SESSION_KEY, { id: u.id, pin: u.pin || "", exp: Date.now() + SESSION_HOURS * 3600 * 1000 });
+    },
+    clear: function () { lsSet(SESSION_KEY, null); },
+    // → { status: "ok" | "denied" | "none" | "wait", user }
+    resolve: function (users, appId) {
+      var s = session.get();
+      if (!s) return { status: "none", user: null };
+      var list = asList(users);
+      if (!list.length) return { status: "wait", user: null }; // team list not loaded yet
+      var u = list.find(function (x) { return x && x.id === s.id; });
+      if (!u || (u.pin || "") !== (s.pin || "")) { session.clear(); return { status: "none", user: null }; }
+      if (appId && !listHasApp(list, u, appId)) return { status: "denied", user: u };
+      return { status: "ok", user: u };
+    },
+    // ?local=1 on an app URL shows that app's own login screen (troubleshooting).
+    localLoginAllowed: function () {
+      try { return /[?&]local=1\b/.test(global.location.search); } catch (e) { return false; }
+    },
+    goHome: function (opts) {
+      opts = opts || {};
+      var q = [];
+      if (opts.next) q.push("next=" + encodeURIComponent(opts.next));
+      if (opts.denied) q.push("denied=" + encodeURIComponent(opts.denied));
+      if (opts.logout) q.push("logout=1");
+      global.location.href = HOME_URL + (q.length ? "?" + q.join("&") : "");
+    }
+  };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -284,6 +346,8 @@
     uid: uid,
     esc: esc,
     mergeUsers: mergeUsers,
+    session: session,
+    userHasAppIn: listHasApp,
     createApp: createApp
   };
 })(typeof window !== "undefined" ? window : this);
