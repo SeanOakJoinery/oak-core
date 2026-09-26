@@ -472,10 +472,17 @@ function suppliers(){
   var src = st.target === "board" ? (D.board && D.board.suppliers) : st.target === "consumables" ? D.cons.suppliers : null;
   return Object.keys(src || {}).map(function(k){ return { id:k, name:(src[k] && src[k].name) || k }; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
 }
+// Boards are shown by name only; the code is a hidden id made automatically.
+function sameBoard(b, n){ return String(b.description||"").trim().toLowerCase() === String(n.description||"").trim().toLowerCase() && String(b.category||"").trim().toLowerCase() === String(n.category||"").trim().toLowerCase(); }
+function newBoardCode(boards, desc){
+  var k = String(desc||"").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 10), base = k ? "B" + k : "BOARD", code = base, i = 2;
+  while(list(boards).some(function(b){ return b.code === code; })) code = base + "-" + (i++);
+  return code;
+}
 function items(){
   if(st.target === "board") return list(D.board && D.board.boards).map(function(b){
-    return { id:b.code, code:b.code, label:b.code + " — " + (b.description||"") + (b.category ? " (" + b.category + ")" : ""), text:[b.code,b.description,b.category,b.size].join(" "), unit:b.unit||"EA" }; })
-    .sort(function(a,b){ return a.code.localeCompare(b.code); });
+    return { id:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
+    .sort(function(a,b){ return a.label.localeCompare(b.label); });
   if(st.target === "consumables"){
     var out = [];
     Object.keys(D.cons.items||{}).forEach(function(id){ var it = D.cons.items[id]; if(!it) return;
@@ -506,10 +513,12 @@ function addLines(raw, source){
   raw.forEach(function(l){ var c = L.norm(l.code); if(c) codeCount[c] = (codeCount[c]||0) + 1; });
   raw.forEach(function(l){
     var m = L.matchLine(l, its, al, { codeUnique: L.norm(l.code) && codeCount[L.norm(l.code)] === 1 });
+    // In the Board Stock template, names are typed exactly — a name that isn't on the list is a new board, not a guess.
+    if(st.target === "board" && source === "Excel template" && m.how === "fuzzy") m = { itemId:null, how:null, score:m.score };
     var line = { key: ++seq, src: l, qty: Number(l.qty)||0, qtyL: l.qtyL, match: m.itemId || "", how: m.how, score: m.score, nf: null };
     if(!line.match){
       // Consumables and Stock List: an unknown line becomes a new item (blue) to check;
-      // Board Stock: left for you to pick, since new boards need a proper code.
+      // Board Stock: left for you to pick, so supplier wording does not create duplicate boards.
       if(canNew() && (st.target !== "board" || source === "Excel template")) line.match = "__new";
     }
     if(line.match === "__new") line.nf = newFields(l);
@@ -534,7 +543,7 @@ function litres(line){
 function newFields(l){
   if(st.target === "board"){
     var size = l.size || ((L.tokens(l.desc).find(function(t){ return /^\d+x\d+$/.test(t); })) || "");
-    return { code:(l.code||"").toUpperCase(), description:l.desc||"", category:size, unit:"EA" };
+    return { description:l.desc||"", category:size, unit:"EA" };
   }
   if(st.target === "consumables"){
     var u = String((l.unit || "") + " " + (l.desc || "")).toLowerCase(), unit = "each";
@@ -642,8 +651,7 @@ function downloadTemplate(){
   var t = st.target, rows, name;
   var head = ["Oak Joinery Stock In — " + TARGETS[t].name + " template. Fill in Qty (leave blank to skip), then upload this file in Stock In."];
   if(t === "board"){
-    rows = [head, [], ["Code","Description","Size","Unit","Qty"]].concat(items().map(function(i){ var b = list(D.board.boards).find(function(x){ return x.code === i.id; }) || {}; return [b.code, b.description||"", b.category||"", b.unit||"EA", ""]; }));
-    rows.push(["","New boards: add a row with a new code","","",""]);
+    rows = [head, [], ["Board","Size","Unit","Qty"]].concat(items().map(function(i){ var b = list(D.board.boards).find(function(x){ return x.code === i.id; }) || {}; return [b.description||"", b.category||"", b.unit||"EA", ""]; }));
   } else if(t === "consumables"){
     rows = [head, [], ["Code","Description","Unit","Qty"]].concat(items().map(function(i){ return [i.id, i.label.replace(/ · .*$/, ""), i.unit, ""]; }));
   } else {
@@ -651,7 +659,7 @@ function downloadTemplate(){
       [st.job || "Example job","Top","1684 x 568 x 17","White Oak S/F",1,"",""]];
   }
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = t === "stock" ? [{wch:26},{wch:22},{wch:18},{wch:18},{wch:8},{wch:8},{wch:24}] : [{wch:14},{wch:44},{wch:12},{wch:8},{wch:8}];
+  ws["!cols"] = t === "board" ? [{wch:40},{wch:14},{wch:8},{wch:8}] : t === "stock" ? [{wch:26},{wch:22},{wch:18},{wch:18},{wch:8},{wch:8},{wch:24}] : [{wch:14},{wch:44},{wch:12},{wch:8},{wch:8}];
   var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stock In");
   name = "oak-stock-in-" + t + "-template.xlsx";
   XLSX.writeFile(wb, name);
@@ -659,12 +667,12 @@ function downloadTemplate(){
 
 // ---------- saving ----------
 function readyLines(){ return st.lines.filter(function(l){ return !l.skip && l.match && ((Number(l.qty)||0) > 0 || (Number(l.qtyL)||0) > 0); }); }
-function lineLabel(l){ if(l.match === "__new"){ var n = l.nf||{}; return "NEW " + (n.code || n.name || ((n.job?n.job+" · ":"") + (n.desc||""))); } var i = itemById(l.match); return i ? i.label : l.match; }
+function lineLabel(l){ if(l.match === "__new"){ var n = l.nf||{}; return "NEW " + (n.description ? n.description + (n.category ? " (" + n.category + ")" : "") : n.name || ((n.job?n.job+" · ":"") + (n.desc||""))); } var i = itemById(l.match); return i ? i.label : l.match; }
 function validateNew(l){
   var n = l.nf || {};
   if(st.target === "board"){
-    if(!n.code || !n.description) return "New board needs a code and description.";
-    if(list(D.board && D.board.boards).some(function(b){ return b.code.toLowerCase() === n.code.toLowerCase(); })) return "Board code " + n.code + " already exists — pick it from the list instead.";
+    if(!n.description) return "New board needs a name.";
+    if(list(D.board && D.board.boards).some(function(b){ return sameBoard(b, n); })) return n.description + (n.category ? " (" + n.category + ")" : "") + " already exists — pick it from the list instead.";
   }
   if(st.target === "consumables" && !n.name) return "New consumable needs a name.";
   if(st.target === "stock" && (!n.job || !n.desc)) return "New Stock List part needs a job and an item name.";
@@ -725,11 +733,11 @@ async function commitBoard(lines, loc, who, reason, summary){
     lines.forEach(function(l){
       var q = Math.round(Number(l.qty)||0), b;
       if(l.match === "__new"){
-        var n = l.nf; b = cur.boards.find(function(x){ return x.code === n.code; });
-        if(!b){ b = { code:n.code, description:n.description, category:n.category||"", unit:n.unit||"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId: st.supplier || "" }; cur.boards.push(b); }
-        l.newId = n.code;
+        var n = l.nf; b = cur.boards.find(function(x){ return sameBoard(x, n); });
+        if(!b){ b = { code:newBoardCode(cur.boards, n.description), description:n.description, category:n.category||"", unit:n.unit||"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId: st.supplier || "" }; cur.boards.push(b); }
+        l.newId = b.code;
       } else b = cur.boards.find(function(x){ return x.code === l.match; });
-      if(!b) throw new Error("Board " + l.match + " no longer exists.");
+      if(!b) throw new Error("One of these boards was deleted in Board Stock — refresh and pick again.");
       if(typeof b.qty === "number"){ var o = {}; o[locs[0]] = b.qty; b.qty = o; }
       if(!b.qty || typeof b.qty !== "object") b.qty = {};
       b.qty[loc] = (Number(b.qty[loc])||0) + q;
@@ -811,7 +819,7 @@ function unitFor(l){
 function newFieldsHtml(l){
   var n = l.nf || {}, k = l.key;
   function f(name, lab, val, ph){ return '<div><label>' + lab + '</label><input data-nf="' + k + '" data-f="' + name + '" value="' + esc(val||"") + '" placeholder="' + esc(ph||"") + '"></div>'; }
-  if(st.target === "board") return '<div class="newf">' + f("code","Code",n.code,"e.g. WHM18") + f("description","Description",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + f("unit","Unit",n.unit,"EA") + '</div>';
+  if(st.target === "board") return '<div class="newf">' + f("description","Board name",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + f("unit","Unit",n.unit,"EA") + '</div>';
   if(st.target === "consumables") return '<div class="newf">' + f("name","Name",n.name,"4x30 chipboard screw") +
     '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div></div>';
   return '<div class="newf">' + f("job","Job",n.job,"Wet Bar Right-Handed") + f("desc","Item",n.desc,"Top") + f("size","Size",n.size,"1684 x 568 x 17") + f("material","Material",n.material,"") + '</div>';
