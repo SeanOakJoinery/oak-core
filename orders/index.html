@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery Orders — track what's been ordered from suppliers, tick off deliveries and add them to Board Stock or Consumables.">
+<title>Orders</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="../manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{--bg:#1E1C18;--panel:#26221C;--panel-2:#2E2A22;--text:#EFE8D8;--muted:#9C9280;--amber:#E3A23A;--amber-dim:#3B2E1A;--line:#433D32;--green:#5FA76E;--green-dim:#1F3325;--rust:#C46A4A;--rust-dim:#3A231B;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;--font-m:"Space Grotesk","Inter",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.wrap{max-width:760px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px}
+.brand .s{font-size:12px;color:var(--muted)}
+h2{font-family:var(--font-m);font-weight:600;font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber-dim);color:var(--amber);font-size:12px;font-weight:600;margin-right:8px;vertical-align:1px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px 10px;font:inherit;font-weight:600;cursor:pointer}
+.seg button.on{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font:inherit;font-size:15px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);text-decoration:none}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn-sm{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amber);background:var(--amber-dim)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--amber);border-color:var(--amber)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+.bar{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .2s}
+.lines{display:grid;gap:10px}
+.line{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.line.ok{border-left-color:var(--green)}
+.line.check{border-left-color:var(--amber)}
+.line.new{border-left-color:#6FA0C8}
+.line.skip{opacity:.55}
+.line .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-word;margin-bottom:6px}
+.line .lrow{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:center}
+.line .unit{font-size:12px;color:var(--muted)}
+.line .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.line .newf{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.line .newf label{margin:0 0 3px}
+.tag{font-size:11px;border-radius:99px;padding:2px 8px;margin-left:6px}
+.tag.ok{background:var(--green-dim);color:var(--green)}.tag.check{background:var(--amber-dim);color:var(--amber)}.tag.new{background:#1C2A36;color:#8FB9DB}
+.sum{position:fixed;left:0;right:0;bottom:0;background:rgba(30,28,24,.96);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+.sum .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{border-top:1px solid var(--line);padding:9px 0;font-size:13px}
+.hist li:first-child{border-top:none}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;z-index:50}
+.toast.show{opacity:1}.toast.err{border-color:var(--rust)}.toast.ok{border-color:var(--green)}
+.empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+.hide{display:none!important}
+
+.olist{display:grid;gap:10px}
+.ord{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:12px;cursor:pointer}
+.ord:hover{border-color:var(--amber)}
+.ord.late{border-left-color:var(--rust)}
+.ord.part{border-left-color:var(--amber)}
+.ord.done{border-left-color:var(--green);opacity:.8}
+.ord.quote{border-left-color:#6FA0C8}
+.ord .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ord .h b{font-size:15px}
+.pill{font-size:11px;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.pill.quote{background:#1C2A36;color:#8FB9DB}.pill.ordered{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+.pill.part{background:var(--amber-dim);color:var(--amber)}.pill.received{background:var(--green-dim);color:var(--green)}
+.pill.late{background:var(--rust-dim);color:#E39A80}.pill.closed{background:var(--panel);color:var(--muted)}
+.prog{height:5px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:var(--green)}
+table.ol{width:100%;border-collapse:collapse;font-size:14px}
+table.ol th{text-align:left;font-size:12px;color:var(--muted);font-weight:500;padding:6px 6px;border-bottom:1px solid var(--line)}
+table.ol td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.ol td.n{text-align:right;white-space:nowrap}
+table.ol tr.out td.n.o{color:var(--amber);font-weight:600}
+table.ol tr.full td{color:var(--muted)}
+.alert{border-color:var(--rust)}
+.alert h2{color:#E39A80}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.kv div:nth-child(odd){color:var(--muted)}
+.backlink{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:0;margin-bottom:10px}
+.line .lrow.r{grid-template-columns:1fr 92px 34px}
+.sub{font-size:12px;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="../icon-192.png" alt=""><div><div class="t">Orders</div><div class="s" id="who">Oak Joinery</div></div></div>
+    <a class="btn btn-sm" href="../">☰ Menu</a>
+  </header>
+  <main id="app"><div class="card muted">Loading…</div></main>
+</div>
+<div class="sum hide" id="sum"><div class="in"><div id="sumText" class="small"></div><button class="btn btn-primary" id="commit">Save</button></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="../oak-core.js?v=3"></script>
+<script>
+/* Oak Joinery — Stock In helpers (pure functions, no Firebase/DOM).
+ * Turns pasted text, Excel rows, PDF text and OCR text into lines
+ * {code, desc, size, job, material, notes, qty, qtyL, text}, and matches
+ * each line to an item in Board Stock, Consumables or Stock List.
+ * Loaded by stock-in/index.html; also require()-able in node for tests. */
+(function (global) {
+  "use strict";
+
+  // ---------- text helpers ----------
+  function norm(s) {
+    return String(s == null ? "" : s).toLowerCase()
+      .replace(/[×]/g, "x")
+      .replace(/(\d)\s*x\s*(\d)/g, "$1x$2")
+      .replace(/(\d),(\d{3})\b/g, "$1$2")
+      .replace(/[^a-z0-9.x]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+  var SYN = {
+    supawood: "mdf", mdf: "mdf", "m.d.f": "mdf",
+    chipboard: "chip", particleboard: "chip", pb: "chip", chip: "chip",
+    melamine: "mel", mel: "mel", mfc: "mel", mf: "mel",
+    wht: "white", wh: "white", blk: "black",
+    ply: "plywood", plywood: "plywood",
+    pr: "pair", prs: "pair", pairs: "pair",
+    pk: "pack", pkt: "pack", pkts: "pack", packs: "pack",
+    ltr: "l", ltrs: "l", litre: "l", litres: "l", liter: "l", liters: "l",
+    screws: "screw", hinges: "hinge", runners: "runner", handles: "handle"
+  };
+  // Board sheet sizes in mm → the ft names used in Board Stock ("9x6").
+  var SHEET = { "2750x1830": "9x6", "2745x1830": "9x6", "2800x1830": "9x6", "2440x1220": "8x4", "2440x1830": "8x6", "3660x1830": "12x6", "3050x1830": "10x6", "1830x2750": "9x6", "1830x3660": "12x6" };
+  function tokens(s) {
+    var out = [];
+    norm(s).split(" ").forEach(function (t) {
+      if (!t) return;
+      if (SHEET[t]) { out.push(SHEET[t]); return; }
+      var m = t.match(/^(\d+(?:\.\d+)?)(mm|m|l|ml|kg|g|x)$/);
+      if (m) { out.push(m[1]); if (m[2] !== "x") out.push(m[2]); return; }
+      if (SYN[t]) { out.push(SYN[t]); return; }
+      out.push(t);
+    });
+    return out;
+  }
+  function isNum(t) { return /^\d+(\.\d+)?$/.test(t); }
+
+  var STOP = /\b(business park|industrial park|exporters|street|avenue|road|drive|postnet|p\.?\s?o\.? box|private bag|suite \d|sales code|sales rep|salesperson|lead time|expires|valid until|att\b|attention|account no|branch code|swift|reference|ref no|your ref|customer no|cust no|order date|printed|telephone|phone|cell|mobile|fax|reg\.? no|co reg|total|sub ?total|vat|tax|invoice|tel|fax|page|bank|account|acc no|branch|email|e-mail|www|http|reg no|registration|balance|amount due|terms|signature|signed|received by|driver|deliver to|delivery address|order no|date|customer|vat no|thank you|delivery note|credit note|quotation|quote no|purchase order|po no|p\/o)\b/i;
+
+  // Header words → field
+  var HEAD = {
+    code: ["code", "item code", "product code", "stock code", "sku", "part no", "part number", "item no", "article", "ref", "board code"],
+    desc: ["description", "item", "product", "desc", "item description", "product description", "details", "name", "board"],
+    qty: ["qty", "quantity", "qty delivered", "qty supplied", "delivered", "supplied", "qty shipped", "units", "qty r", "qty right", "count", "qty ordered"],
+    qtyL: ["qty l", "qty left", "left"],
+    size: ["size", "dimensions", "dimension"],
+    job: ["job", "category", "cat", "category / job"],
+    material: ["material"],
+    notes: ["notes", "note", "comment", "comments"]
+  };
+  function headField(h) {
+    var n = String(h || "").trim().toLowerCase().replace(/[:.]/g, "").replace(/\s+/g, " ");
+    for (var f in HEAD) if (HEAD[f].indexOf(n) >= 0) return f;
+    return null;
+  }
+
+  function toQty(v) {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    var s = String(v).trim().replace(/\s/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "");
+    var m = s.match(/^-?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+
+  // ---------- table rows (Excel / pasted tab-separated) ----------
+  // rows: array of arrays. Returns lines, or null if no header row found.
+  function linesFromTable(rows) {
+    rows = (rows || []).filter(function (r) { return r && r.some(function (c) { return String(c == null ? "" : c).trim() !== ""; }); });
+    var hi = -1, map = null;
+    for (var i = 0; i < Math.min(rows.length, 15); i++) {
+      var m = {}, hits = 0;
+      rows[i].forEach(function (c, j) { var f = headField(c); if (f && m[f] === undefined) { m[f] = j; hits++; } });
+      if (hits >= 2 && (m.qty !== undefined) && (m.desc !== undefined || m.code !== undefined)) { hi = i; map = m; break; }
+    }
+    if (hi < 0) return null;
+    var out = [];
+    rows.slice(hi + 1).forEach(function (r) {
+      var get = function (f) { return map[f] === undefined ? "" : String(r[map[f]] == null ? "" : r[map[f]]).trim(); };
+      var line = { code: get("code"), desc: get("desc"), size: get("size"), job: get("job"), material: get("material"), notes: get("notes"),
+        qty: toQty(map.qty === undefined ? null : r[map.qty]), qtyL: map.qtyL === undefined ? null : toQty(r[map.qtyL]) };
+      if (!line.code && !line.desc) return;
+      if (STOP.test(line.desc) && !line.code) return;
+      line.text = [line.code, line.desc, line.size].filter(Boolean).join("  ");
+      out.push(line);
+    });
+    return out;
+  }
+
+  // ---------- free text lines (PDF text / OCR / pasted text) ----------
+  function parseTextLine(raw) {
+    var text = String(raw || "").replace(/\t/g, "  ").replace(/[|]/g, " ").trim();
+    if (!text || text.length < 3) return null;
+    if (!/[a-z]/i.test(text) || !/\d/.test(text)) return null;
+    if (STOP.test(text)) return null;
+    var toks = text.split(/\s+/);
+    var info = toks.map(function (t, i) {
+      var clean = t.replace(/^[^\w]+|[^\w.,]+$/g, "");
+      var plainInt = /^\d{1,5}([.,]0{1,3})?$/.test(clean);
+      var price = /^\d{1,3}([ ,]\d{3})*[.,]\d{2}$/.test(clean) && !/[.,]00?$/.test(clean);
+      var money = /^R\d/i.test(t) || /%$/.test(t);
+      var code = /[a-z]/i.test(clean) && /\d/.test(clean) && clean.length >= 3 && clean.length <= 20 && !/^\d+(mm|m|l|ml|kg|g)$/i.test(clean) && !/^\d+x\d+/i.test(clean);
+      return { t: t, clean: clean, i: i, plainInt: plainInt && !money, strictInt: /^\d{1,5}$/.test(clean) && !money, price: price || money, code: code, alpha: /^[a-z][a-z&'/-]*$/i.test(clean) };
+    });
+    var qtyIdx = -1;
+    // "... x 8" or "qty 8" at the end of the line
+    var L = info.length;
+    if (L > 2 && info[L - 1].plainInt && /^(x|qty|qty:)$/i.test(info[L - 2].clean || info[L - 2].t)) qtyIdx = L - 1;
+    // Delivery-note style: "10  CH16  16mm chipboard" — leading number.
+    if (qtyIdx < 0 && info.length > 1 && info[0].plainInt && !info[1].plainInt) qtyIdx = 0;
+    if (qtyIdx < 0) {
+      // Invoice style: CODE DESCRIPTION QTY PRICE ... TOTAL — first plain
+      // integer after some description words, preferring one followed by a price.
+      var UNITW = /^(thd|th|ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i;
+      var seenWord = false, firstAfter = -1, withPrice = -1, looseFirst = -1;
+      for (var k = 0; k < info.length; k++) {
+        if (info[k].alpha) seenWord = true;
+        if (seenWord && info[k].plainInt && !info[k].strictInt) {
+          if (looseFirst < 0) looseFirst = k;
+          var jj = k + 1; while (info[jj] && /^(thd|th|ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|m|l|ltr|kg|lengths?|bags?)$/i.test(info[jj].clean)) jj++;
+          if (withPrice < 0 && info[jj] && (info[jj].price || /^R?\d[\d ,]*[.,]\d{2}$/i.test(info[jj].clean))) withPrice = k;
+          continue;
+        }
+        if (seenWord && info[k].strictInt) {
+          var prev = info[k - 1] && info[k - 1].clean.toLowerCase();
+          var next = info[k + 1] && info[k + 1].clean.toLowerCase();
+          if (next && /^(mm|m|x|ml|l|kg|g|mic|micron)$/.test(next)) continue; // "16 mm"
+          if (prev === "x" || (next === "x")) continue;
+          if (firstAfter < 0) firstAfter = k;
+          var j = k + 1; while (info[j] && UNITW.test(info[j].clean)) j++;
+          var nx = info[j];
+          if (withPrice < 0 && nx && (nx.price || /^R?\d[\d ,]*[.,]\d{2}$/i.test(nx.clean))) withPrice = k;
+        }
+      }
+      if (firstAfter >= 0 && looseFirst >= 0 && looseFirst < firstAfter && toQty(info[firstAfter].clean) >= 1000) firstAfter = -1;
+      if (withPrice >= 0 && looseFirst >= 0 && looseFirst < withPrice && toQty(info[withPrice].clean) >= 1000) withPrice = looseFirst;
+      qtyIdx = withPrice >= 0 ? withPrice : (firstAfter >= 0 ? firstAfter : looseFirst);
+    }
+    if (qtyIdx < 0) return null;
+    var qty = toQty(info[qtyIdx].clean);
+    if (!qty || qty <= 0 || qty > 100000) return null;
+    var codeTok = info.find(function (x) { return x.i !== qtyIdx && x.code && x.i < (qtyIdx === 0 ? 3 : qtyIdx); });
+    var descEnd = qtyIdx === 0 ? info.length : qtyIdx;
+    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
+      .map(function (x) { return x.t; }).join(" ").replace(/\s+/g, " ").trim();
+    // Drop trailing unit words ("EA", "each") from the description
+    desc = desc.replace(/\s+(ea|each|pcs|pc|no|unit|units|sheets?)$/i, "");
+    if (!desc && !codeTok) return null;
+    // OCR noise ("i Lo a J 4 ie"): need real words
+    var words = (desc.match(/[A-Za-z]{3,}/g) || []);
+    if (!words.length || (!codeTok && words.length < 2 && !/[A-Za-z]{5,}/.test(desc))) return null;
+    return { code: codeTok ? codeTok.clean : "", desc: desc, size: "", job: "", material: "", notes: "", qty: qty, qtyL: null, text: text.replace(/\s{2,}/g, "  ") };
+  }
+
+  // Invoices/quotes: only read the item table — the lines after the column
+  // header row ("Code  Description  Qty ...") up to the totals/footer.
+  var HEADROW = /\b(qty|quantity|qnty|units?)\b/i, HEADDESC = /\b(description|desc|item|product|details)\b/i;
+  var FOOT = /\b(total item|net value|sub ?total|total excl|total incl|total vat|vat total|amount due|balance due|terms and conditions|terms of|banking details|deliver to|delivery address|received by|thank you)\b/i;
+  function linesFromDoc(text) {
+    var rows = String(text || "").split(/\r?\n/);
+    var out = [], inTable = false, found = false;
+    rows.forEach(function (r) {
+      if (!inTable && HEADROW.test(r) && HEADDESC.test(r) && !/\d{3,}/.test(r)) { inTable = true; found = true; return; }
+      if (inTable && FOOT.test(r)) { inTable = false; return; }
+      if (inTable) { var l = parseTextLine(r); if (l) out.push(l); }
+    });
+    return found && out.length ? out : linesFromText(text);
+  }
+
+  function linesFromText(text) {
+    var rows = String(text || "").split(/\r?\n/);
+    // Tab-separated paste with a header row → treat as a table.
+    if (rows.some(function (r) { return r.indexOf("\t") >= 0; })) {
+      var t = linesFromTable(rows.map(function (r) { return r.split("\t"); }));
+      if (t && t.length) return t;
+    }
+    return rows.map(parseTextLine).filter(Boolean);
+  }
+
+  // PDF.js text items → text lines (grouped by y, gaps kept as double spaces).
+  function pdfItemsToText(items) {
+    var rows = [];
+    items.forEach(function (it) {
+      if (!it.str || !it.str.trim()) return;
+      var x = it.transform[4], y = it.transform[5];
+      var row = rows.find(function (r) { return Math.abs(r.y - y) < 3; });
+      if (!row) { row = { y: y, parts: [] }; rows.push(row); }
+      row.parts.push({ x: x, w: it.width || 0, s: it.str });
+    });
+    rows.sort(function (a, b) { return b.y - a.y; });
+    return rows.map(function (r) {
+      r.parts.sort(function (a, b) { return a.x - b.x; });
+      var out = "", end = null;
+      r.parts.forEach(function (p) {
+        if (end !== null) out += (p.x - end > 8 ? "  " : (p.x - end > 1 ? " " : ""));
+        out += p.s; end = p.x + p.w;
+      });
+      return out;
+    }).join("\n");
+  }
+
+  // PDF.js items of ONE page → item-table lines using the column header's
+  // x-positions (Code | Description | Qty | Unit | Price ...). Returns [] if
+  // the page has no recognisable item table.
+  function pdfTable(items) {
+    var rows = [];
+    items.forEach(function (it) {
+      if (!it.str || !it.str.trim()) return;
+      var x = it.transform[4], y = it.transform[5];
+      var row = rows.find(function (r) { return Math.abs(r.y - y) < 3; });
+      if (!row) { row = { y: y, parts: [] }; rows.push(row); }
+      row.parts.push({ x: x, w: it.width || 0, s: it.str.trim().replace(/\u019f|\u01a0|\u01ac|\u0187/g, "ti").replace(/\ufb01/g, "fi").replace(/\ufb02/g, "fl") });
+    });
+    rows.sort(function (a, b) { return b.y - a.y; });
+    rows.forEach(function (r) { r.parts.sort(function (a, b) { return a.x - b.x; }); r.text = r.parts.map(function (p) { return p.s; }).join(" "); });
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!(HEADROW.test(r.text) && HEADDESC.test(r.text)) || /\d{3,}/.test(r.text)) continue;
+      // header columns (split multi-word header items on 2+ spaces is not needed: pdf.js gives runs)
+      var cols = r.parts.map(function (p) { return { x: p.x, c: p.x + p.w / 2, label: p.s.toLowerCase() }; });
+      var find = function (re) { var c = cols.findIndex(function (c) { return re.test(c.label); }); return c; };
+      var qi = find(/\b(qty|quantity|qnty|units?)\b/);
+      var di = find(/\b(description|desc)\b/);
+      if (di < 0) di = find(/\b(item|product|details)\b/);
+      var ci = find(/\b(code|sku|part|item no|item code|product code|stock code|article)\b/);
+      if (ci < 0) { var alt = find(/^(item|product)$/); if (alt >= 0 && alt !== di) ci = alt; }
+      var ui = find(/^unit$|^uom$|^u\/m$/);
+      if (qi < 0 || di < 0) continue;
+      // each value goes to the header column whose centre is nearest (handles
+      // left-, centre- and right-aligned columns); long text that starts inside
+      // a column stays in that column.
+      var colOf = function (p) {
+        var mid = p.x + p.w / 2, best = 0, bd = 1e9;
+        for (var c = 0; c < cols.length; c++) { var d = Math.abs(cols[c].c - mid); if (d < bd) { bd = d; best = c; } }
+        return best;
+      };
+      var last = null;
+      for (var j = i + 1; j < rows.length; j++) {
+        var rr = rows[j];
+        if (FOOT.test(rr.text) || (HEADROW.test(rr.text) && HEADDESC.test(rr.text) && !/\d{3,}/.test(rr.text))) break;
+        var cells = cols.map(function () { return []; });
+        rr.parts.forEach(function (p) { cells[colOf(p)].push(p.s); });
+        var cell = function (k) { return k < 0 ? "" : cells[k].join(" ").trim(); };
+        var qtxt = cell(qi), desc = cell(di), code = cell(ci), unit = cell(ui);
+        // quantity printed slightly off its header ("5000 Each" under Unit)
+        if (!qtxt) [qi + 1, qi - 1].forEach(function (k) { var t = cell(k); if (!qtxt && k !== di && k !== ci && /^\d[\d ,]*(\.\d+)?(\s+[a-z\/]+)?$/i.test(t) && !/^R/i.test(t)) { qtxt = t; if (k === ui) unit = ""; } });
+        if (/^(sub ?total|total|vat|tax|discount|net value)\b/i.test(desc) || /^(sub ?total|total|vat|tax)\b/i.test(code)) break;
+        // code and description printed as one run ("BO0001 IMPACT POZI ...")
+        if (code && !desc && /\s/.test(code)) { desc = code.replace(/^\S+\s+/, ""); code = code.split(/\s+/)[0]; }
+        var qm = qtxt.match(/-?\d[\d ,]*(\.\d+)?/);
+        var q = qm ? toQty(qm[0].replace(/ /g, "")) : null;
+        if (!q) {
+          // continuation line of the previous description ("Tapper BZ", "runner")
+          var others = cells.filter(function (c, k) { return k !== di && c.length; }).length;
+          if (last && desc && !others && !/\d/.test(desc) && desc.length < 40 && !/\b(supplier|stock|deliver|delivered|urgent|will|please|note|att|attention|boks|boksburg|anderbolt|road)\b/i.test(desc)) { last.desc += " " + desc; last.text += " " + desc; }
+          continue;
+        }
+        if (!unit) { var um = qtxt.match(/[a-z]+/i); if (um) unit = um[0]; }
+        if (!code) { var m = desc.match(/^([A-Za-z0-9.\/-]{2,20})\s+-\s+(.*)$/); if (m) { code = m[1]; desc = m[2]; } }
+        if (!code && /^\S{12,}\s/.test(desc) && /[\/\d]/.test(desc.split(/\s/)[0])) { code = desc.split(/\s+/)[0]; desc = desc.replace(/^\S+\s+/, ""); }
+        if (code && !/\d/.test(code)) code = "";
+        if (!desc && !code) continue;
+        if (/^(b\/n|batch|lot)\b/i.test(desc)) continue;
+        desc = desc.replace(/^ITEM\/\S+\s+/, "");
+        last = { code: code, desc: desc, size: "", job: "", material: "", notes: "", qty: q, qtyL: null, unit: unit || "", text: rr.text };
+        out.push(last);
+      }
+      break;
+    }
+    return out;
+  }
+
+  // ---------- matching ----------
+  // items: [{id, label, code, text, job, desc, size}]
+  function aliasKey(line) {
+    var k = norm([line.code, line.desc, line.size].filter(Boolean).join(" "));
+    return k.replace(/[.#$\[\]\/]/g, "_").slice(0, 120);
+  }
+  function score(lineToks, itemToks) {
+    if (!lineToks.length || !itemToks.length) return 0;
+    var lw = lineToks.filter(function (t) { return !isNum(t); }), iw = itemToks.filter(function (t) { return !isNum(t); });
+    var ln = lineToks.filter(isNum), inum = itemToks.filter(isNum);
+    var inter = iw.filter(function (t) { return lw.indexOf(t) >= 0; }).length;
+    var wordScore = iw.length ? inter / iw.length : 0;
+    var extra = lw.length ? inter / lw.length : 0;
+    if (!inum.length) return wordScore * 0.8 + extra * 0.2; // no numbers to compare on
+    var numScore = 1;
+    if (inum.length) {
+      var hit = inum.filter(function (n) { return ln.indexOf(n) >= 0; }).length;
+      numScore = hit / inum.length;
+      if (hit === 0) return wordScore * 0.25; // 16mm vs 22mm: different item
+    }
+    return wordScore * 0.55 + extra * 0.15 + numScore * 0.30;
+  }
+  // Returns {itemId, how: 'alias'|'code'|'exact'|'fuzzy'|null, score}
+  function codeKey(line) { var c = norm(line.code); return c ? ("code " + c).replace(/[.#$\[\]\/]/g, "_").slice(0, 120) : ""; }
+  // opts.codeUnique: this line's supplier code appears only once in the document
+  // (so a generic code like Jamac's "BO0001" is never used on its own).
+  function matchLine(line, items, aliases, opts) {
+    aliases = aliases || {}; opts = opts || {};
+    var has = function (k) { return k && aliases[k] && items.some(function (i) { return i.id === aliases[k].itemId; }); };
+    var ak = aliasKey(line), ck = codeKey(line);
+    if (has(ak)) return { itemId: aliases[ak].itemId, how: "alias", score: 1 };
+    if (opts.codeUnique && has(ck)) return { itemId: aliases[ck].itemId, how: "alias", score: 1 };
+    var nc = norm(line.code);
+    if (nc) {
+      var byCode = items.find(function (i) { return i.code && norm(i.code) === nc; });
+      if (byCode) return { itemId: byCode.id, how: "code", score: 1 };
+    }
+    // Stock List: same job + item + size
+    if (line.desc) {
+      var nd = norm(line.desc), ns = norm(line.size), nj = norm(line.job);
+      var exact = items.find(function (i) { return i.desc !== undefined && norm(i.desc) === nd && norm(i.size) === ns && (!nj || norm(i.job) === nj); });
+      if (exact) return { itemId: exact.id, how: "exact", score: 1 };
+    }
+    var lt = tokens([line.code, line.desc, line.size].join(" "));
+    var best = null, bestS = 0, second = 0;
+    items.forEach(function (i) {
+      var s = score(lt, i._toks || (i._toks = tokens(i.text)));
+      if (s > bestS) { second = bestS; bestS = s; best = i; } else if (s > second) second = s;
+    });
+    if (best && bestS >= 0.5 && bestS - second > 0.02) return { itemId: best.id, how: "fuzzy", score: bestS };
+    return { itemId: null, how: null, score: bestS };
+  }
+
+  var api = { norm: norm, tokens: tokens, toQty: toQty, linesFromTable: linesFromTable, parseTextLine: parseTextLine,
+    linesFromText: linesFromText, linesFromDoc: linesFromDoc, pdfTable: pdfTable, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, codeKey: codeKey, score: score };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else global.StockInLib = api;
+})(typeof window !== "undefined" ? window : this);
+
+</script>
+<script>
+(function(){
+"use strict";
+var L = StockInLib, S = OakCore.session, esc = OakCore.esc;
+var core = OakCore.createApp({ appId: "orders", readOnly: true });
+var db = null;
+
+var UNITS = { per500:"pack(s)", each:"each", pair:"pair(s)", roll:"roll(s)", tin:"tin(s)" };
+var LATE_DAYS = 7;
+function perm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
+function canBoard(u){ return core.userHasApp(u, "boardStock") && perm(u, "boardAddQty"); }
+function canCons(u){ return core.userHasApp(u, "consumables") && (perm(u, "consManageItems") || perm(u, "consManageConsumables")); }
+function allowed(u){ return canBoard(u) || canCons(u); }
+
+// ---------- state ----------
+var user = null;
+var D = { board:null, cons:{ items:{}, types:{}, suppliers:{}, meta:{} }, orders:{}, aliases:{}, loaded:false };
+var ui = { view:"list", filter:"open", search:"", orderId:null };
+var draft = null;   // new / edit order
+var rcv = null;     // receiving a delivery
+var busy = false, statusMsg = "", progress = 0, seq = 0;
+
+function toast(msg, kind){ var t = document.getElementById("toast"); t.textContent = msg; t.className = "toast show " + (kind||""); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.className = "toast"; }, 3400); }
+function list(v){ return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.keys(v).map(function(k){ return v[k]; }).filter(Boolean) : []); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function fbKey(s){ return String(s).replace(/[.#$\[\]\/]/g, "_"); }
+function today(){ var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function daysSince(ymd){ if(!ymd) return 0; return Math.floor((Date.now() - new Date(ymd + "T00:00:00").getTime()) / 86400000); }
+function fmtDate(ymd){ if(!ymd) return "—"; var d = new Date(ymd + "T00:00:00"); return d.toLocaleDateString("en-ZA", { day:"2-digit", month:"short", year:"numeric" }); }
+function num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+function r2(n){ return Math.round(n * 100) / 100; }
+
+// ---------- stock items (Board Stock + Consumables) ----------
+function boardItems(){
+  return list(D.board && D.board.boards).map(function(b){
+    return { id:"b:" + b.code, target:"board", ref:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
+    .sort(function(a,b){ return a.label.localeCompare(b.label); });
+}
+function consItems(){
+  var out = [];
+  Object.keys(D.cons.items||{}).forEach(function(id){ var it = D.cons.items[id]; if(!it) return;
+    var name = (it.size||"") + (it.packSize ? " (" + it.packSize + ")" : "");
+    var u = UNITS[it.unit] || "pack(s)";
+    out.push({ id:"c:s:" + id, target:"consumables", ref:"s:" + id, kind:"screw", rid:id, label:name + " · " + u, text:[it.size,it.packSize,it.category].join(" "), unit:u }); });
+  Object.keys(D.cons.types||{}).forEach(function(id){ var t = D.cons.types[id]; if(!t) return;
+    if(t.category === "liquid") out.push({ id:"c:l:" + id, target:"consumables", ref:"l:" + id, kind:"liquid", rid:id, label:t.name + " · litres", text:t.name, unit:"litres" });
+    else out.push({ id:"c:u:" + id, target:"consumables", ref:"u:" + id, kind:"unit", rid:id, label:t.name + " · full containers", text:t.name, unit:"container(s)" }); });
+  return out.sort(function(a,b){ return a.label.localeCompare(b.label); });
+}
+function stockById(id){
+  if(!id) return null;
+  var arr = id.indexOf("b:") === 0 ? boardItems() : consItems();
+  return arr.find(function(i){ return i.id === id; }) || null;
+}
+function targetOf(stock){ return !stock ? "" : (stock.indexOf("b:") === 0 || stock === "new:board") ? "board" : (stock.indexOf("c:") === 0 || stock === "new:cons") ? "consumables" : ""; }
+function stockLabel(line){
+  if(line.stock === "none") return "Not stock (nothing added)";
+  if(!line.stock) return "⚠ Not linked to stock yet — edit the order to link it";
+  if(line.stock === "new:board") return "NEW board: " + ((line.nf && line.nf.description) || line.desc || line.text || "");
+  if(line.stock === "new:cons") return "NEW consumable: " + ((line.nf && line.nf.name) || line.desc || line.text || "");
+  var i = stockById(line.stock); return i ? i.label : (line.stockLabel || "(item removed)");
+}
+// Consumables counted in packs (e.g. screws per 500) can be ordered per pack or per single item.
+function packSizeOf(line){
+  var stock = line && line.stock;
+  if(stock === "new:cons") return (line.nf && line.nf.unit === "per500") ? (parseInt(line.nf.bundle) || 500) : 0;
+  if(!stock || stock.indexOf("c:s:") !== 0) return 0;
+  var it = D.cons.items[stock.slice(4)]; if(!it || (it.unit && it.unit !== "per500")) return 0;
+  return parseInt(it.bundleSize) || 500;
+}
+function guessPer(line){
+  var ps = packSizeOf(line); if(!ps) return "";
+  return (/\b(each|ea)\b/i.test(line.text || "") || num(line.qty) >= ps) ? "each" : "pack";
+}
+// qty in the stock app's own unit (packs), from an order qty
+function toStockQty(line, qty){ var ps = packSizeOf(line); return ps && line.per === "each" ? Math.round(qty / ps * 1e6) / 1e6 : qty; }
+function unitOf(line){
+  if(packSizeOf(line)) return line.per === "each" ? "each (single)" : "pack(s) of " + packSizeOf(line);
+  if(line.stock === "new:board") return "EA";
+  if(line.stock === "new:cons") return UNITS[(line.nf||{}).unit] || "each";
+  var i = stockById(line.stock); return i ? i.unit : (line.unit || "");
+}
+// Match a supplier line to a stock item in either app. Best of the two wins.
+function matchStock(src, codeUnique){
+  var best = { id:"", score:0, how:null };
+  [["board", boardItems()], ["consumables", consItems()]].forEach(function(p){
+    var target = p[0], its = p[1].map(function(i){ return { id:i.id, code:"", desc:i.desc, size:i.size, text:i.text }; });
+    var al = {}, raw = D.aliases[target] || {};
+    // stockIn aliases store Board codes / consumable refs — convert to our ids
+    Object.keys(raw).forEach(function(k){ var a = raw[k]; if(a && a.itemId) al[k] = { itemId: (target === "board" ? "b:" : "c:") + a.itemId }; });
+    var m = L.matchLine(src, its, al, { codeUnique: codeUnique });
+    if(m.itemId && (m.score || 0) > best.score) best = { id:m.itemId, score:m.score || 0, how:m.how };
+  });
+  return best;
+}
+
+// ---------- suppliers ----------
+function allSuppliers(){
+  var seen = {}, out = [];
+  [[D.board && D.board.suppliers, "b"], [D.cons.suppliers, "c"]].forEach(function(p){
+    Object.keys(p[0] || {}).forEach(function(k){ var s = p[0][k]; if(!s || !s.name) return;
+      var key = s.name.trim().toLowerCase(); if(seen[key]){ if(!seen[key].email && s.email) seen[key].email = s.email; return; }
+      seen[key] = { name:s.name.trim(), email:(s.email||"").trim(), contact:s.contactPerson||"" }; out.push(seen[key]); });
+  });
+  list(D.orders).forEach(function(o){ var key = String(o.supplier||"").trim().toLowerCase(); if(key && !seen[key]){ seen[key] = { name:o.supplier.trim(), email:o.supplierEmail||"" }; out.push(seen[key]); } });
+  return out.sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+
+// ---------- order maths ----------
+function orderLines(o){ return Object.keys((o && o.lines) || {}).map(function(k){ var l = o.lines[k]; l.lid = k; return l; }).sort(function(a,b){ return num(a.n) - num(b.n); }); }
+function outstanding(l){ return Math.max(0, r2(num(l.qty) - num(l.received))); }
+function orderOut(o){ return orderLines(o).reduce(function(a,l){ return a + outstanding(l); }, 0); }
+function orderQty(o){ return orderLines(o).reduce(function(a,l){ return a + num(l.qty); }, 0); }
+function isOpen(o){ return o.status === "ordered" || o.status === "part"; }
+function isLate(o){ return isOpen(o) && orderOut(o) > 0 && daysSince(o.orderedDate) >= LATE_DAYS; }
+function statusPill(o){
+  if(isLate(o)) return '<span class="pill late">' + daysSince(o.orderedDate) + ' days — outstanding</span>';
+  var t = { quote:"Quote", ordered:"Ordered", part:"Part delivered", received:"All received", closed:"Closed" }[o.status] || o.status;
+  return '<span class="pill ' + esc(o.status) + '">' + t + '</span>';
+}
+function ordersArr(){ return Object.keys(D.orders || {}).map(function(k){ var o = D.orders[k]; o.id = k; return o; }); }
+
+// ---------- reading quotations & delivery notes ----------
+function setStatus(msg, pct){ statusMsg = msg; if(pct !== undefined) progress = pct; var s = document.getElementById("status"); if(s) s.textContent = msg; var b = document.getElementById("barI"); if(b) b.style.width = Math.round((progress||0)*100) + "%"; }
+function loadScript(src){ return new Promise(function(res, rej){ var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function(){ rej(new Error("Could not load " + src)); }; document.head.appendChild(s); }); }
+async function pdfLib(){
+  if(!window.pdfjsLib){ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"); }
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return window.pdfjsLib;
+}
+var ocrWorker = null;
+async function ocr(canvasOrImg, label){
+  if(!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  if(!ocrWorker){
+    setStatus("Getting the text reader ready (first time only)…", 0.05);
+    ocrWorker = await Tesseract.createWorker("eng", 1, {
+      langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+      logger: function(m){ if(m.status === "recognizing text") setStatus("Reading " + label + "… " + Math.round(m.progress*100) + "%", m.progress); }
+    });
+    await ocrWorker.setParameters({ preserve_interword_spaces: "1" });
+  }
+  var r = await ocrWorker.recognize(canvasOrImg);
+  return r.data.text || "";
+}
+function imageToCanvas(file){
+  return new Promise(function(res, rej){
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function(){
+      var max = 2200, sc = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement("canvas"); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      var g = c.getContext("2d"); g.filter = "grayscale(1) contrast(1.25)"; g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("That picture couldn't be opened.")); };
+    img.src = url;
+  });
+}
+// Returns the lines found in a PDF / photo / Excel file (same reader as Stock In).
+async function readDoc(file){
+  var name = file.name || "file", lower = name.toLowerCase();
+  if(/\.(xlsx|xls|xlsm|csv)$/.test(lower)){
+    setStatus("Reading " + name + "…", 0.3);
+    var wb = XLSX.read(await file.arrayBuffer(), { type:"array" }), raw = [];
+    wb.SheetNames.forEach(function(sn){
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"", raw:true });
+      var t = L.linesFromTable(rows);
+      raw = raw.concat(t || L.linesFromText(rows.map(function(r){ return r.join("  "); }).join("\n")));
+    });
+    return raw;
+  }
+  if(/\.pdf$/.test(lower) || file.type === "application/pdf"){
+    setStatus("Opening PDF…", 0.1);
+    var pdfjs = await pdfLib();
+    var pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    var text = "", table = [];
+    for(var p = 1; p <= Math.min(pdf.numPages, 10); p++){
+      var page = await pdf.getPage(p), tc = await page.getTextContent();
+      text += L.pdfItemsToText(tc.items) + "\n";
+      table = table.concat(L.pdfTable(tc.items));
+    }
+    if(text.replace(/\s/g, "").length < 40){
+      text = "";
+      for(var q = 1; q <= Math.min(pdf.numPages, 5); q++){
+        var pg = await pdf.getPage(q), vp = pg.getViewport({ scale: 2.2 });
+        var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        text += await ocr(c, "page " + q) + "\n";
+      }
+    }
+    return table.length ? table : L.linesFromDoc(text);
+  }
+  if(/^image\//.test(file.type) || /\.(jpe?g|png|heic|webp)$/.test(lower)){
+    return L.linesFromDoc(await ocr(await imageToCanvas(file), "photo"));
+  }
+  throw new Error("That file type isn't supported. Use a PDF, photo, Excel or CSV file.");
+}
+async function readInto(file, fn){
+  busy = true; render();
+  try{ var raw = await readDoc(file); setStatus("", 1); fn(raw || [], file); }
+  catch(e){ console.warn(e); toast("Couldn't read that file: " + (e.message || e), "err"); setStatus(""); }
+  busy = false; render();
+}
+async function uploadDoc(folder, id, file){
+  if(!file || !firebase.storage) return "";
+  try{
+    var ref = firebase.storage().ref(folder + "/" + id + "-" + file.name.replace(/[^\w.\-]+/g, "_"));
+    await ref.put(file); return await ref.getDownloadURL();
+  }catch(e){ console.warn("doc upload", e); return ""; }
+}
+// Quotation / order lines → draft lines matched to stock
+function addDraftLines(raw, source){
+  if(!raw.length){ toast("No lines with a quantity found in that " + source + ".", "err"); return; }
+  var cc = {}; raw.forEach(function(l){ var c = L.norm(l.code); if(c) cc[c] = (cc[c]||0) + 1; });
+  raw.forEach(function(l){
+    var m = matchStock(l, L.norm(l.code) && cc[L.norm(l.code)] === 1);
+    draft.lines.push({ key:++seq, text:l.text || [l.code,l.desc,l.size].filter(Boolean).join("  "), code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:0,
+      stock:m.score >= 0.5 ? m.id : "", how:m.how, score:m.score });
+    var nl = draft.lines[draft.lines.length - 1]; nl.per = guessPer(nl);
+  });
+  var got = draft.lines.filter(function(x){ return x.stock; }).length;
+  toast("Read " + raw.length + " line" + (raw.length===1?"":"s") + " — " + got + " matched to stock. Check them below.", "ok");
+}
+
+// ---------- views ----------
+function render(){
+  var root = document.getElementById("app");
+  if(!user) return;
+  if(!allowed(user)){
+    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">Orders is for people who add stock to Board Stock or Consumables. Ask Sean to give you "Add stock" in one of them.</p><a class="btn" href="../">Back to menu</a></div>';
+    footer(null); return;
+  }
+  if(ui.view === "edit" && draft) root.innerHTML = viewEdit();
+  else if(ui.view === "order" && D.orders[ui.orderId]) root.innerHTML = viewOrder(D.orders[ui.orderId]);
+  else if(ui.view === "receive" && rcv) root.innerHTML = viewReceive();
+  else { ui.view = "list"; root.innerHTML = viewList(); }
+  bind();
+}
+function footer(text, label, disabled){
+  var sum = document.getElementById("sum");
+  sum.classList.toggle("hide", !text);
+  if(!text) return;
+  document.getElementById("sumText").innerHTML = text;
+  var b = document.getElementById("commit"); b.textContent = busy ? "Saving…" : label; b.disabled = busy || !!disabled;
+}
+
+function orderCard(o){
+  var lines = orderLines(o), qty = orderQty(o), out = orderOut(o);
+  var pct = qty ? Math.round((qty - out) / qty * 100) : 0;
+  var cls = isLate(o) ? "late" : o.status === "part" ? "part" : (o.status === "received" || o.status === "closed") ? "done" : o.status === "quote" ? "quote" : "";
+  return '<div class="ord ' + cls + '" data-open="' + esc(o.id) + '"><div class="h"><b>' + esc(o.supplier || "—") + '</b>' + statusPill(o) + '</div>' +
+    '<div class="small muted">' + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
+    (o.status === "quote" ? " · quote from " + fmtDate(o.quoteDate || (o.created||"").slice(0,10)) : " · ordered " + fmtDate(o.orderedDate)) +
+    (isOpen(o) && out > 0 ? " · <b style='color:var(--amber)'>" + lines.filter(function(l){ return outstanding(l) > 0; }).length + " line(s) still to come</b>" : "") + '</div>' +
+    (o.status !== "quote" ? '<div class="prog"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
+}
+function viewList(){
+  footer(null);
+  var all = ordersArr(), q = ui.search.trim().toLowerCase();
+  var match = function(o){ return !q || [o.supplier, o.ref, o.notes].concat(orderLines(o).map(function(l){ return l.text + " " + stockLabel(l); })).join(" ").toLowerCase().indexOf(q) >= 0; };
+  var late = all.filter(isLate).sort(function(a,b){ return String(a.orderedDate).localeCompare(String(b.orderedDate)); });
+  var h = '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
+  if(late.length){
+    var dow = new Date().getDay();
+    h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — " : dow === 3 ? "Wednesday check — " : "") + 'still outstanding after a week</h2><p class="small muted" style="margin-top:0">Ordered ' + LATE_DAYS + '+ days ago and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
+  }
+  var filters = [["open","Open orders"],["quote","Quotes"],["done","Received / closed"],["all","All"]];
+  h += '<div class="card"><div class="tabs">' + filters.map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
+       '<input id="search" placeholder="Search supplier, order no. or item…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
+  var shown = all.filter(function(o){
+    if(ui.filter === "open") return isOpen(o);
+    if(ui.filter === "quote") return o.status === "quote";
+    if(ui.filter === "done") return o.status === "received" || o.status === "closed";
+    return true;
+  }).filter(match).sort(function(a,b){ return String(b.orderedDate || b.created || "").localeCompare(String(a.orderedDate || a.created || "")); });
+  h += shown.length ? '<div class="olist">' + shown.map(orderCard).join("") + '</div>' : '<div class="empty">' + (all.length ? "Nothing here." : "No orders yet. Tap “New order / quote” and upload a quotation, or type the lines.") + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function supplierField(val, email){
+  var sups = allSuppliers();
+  return '<div><label>Supplier</label><input id="dSup" list="supList" value="' + esc(val) + '" placeholder="Start typing…"><datalist id="supList">' + sups.map(function(s){ return '<option value="' + esc(s.name) + '">'; }).join("") + '</datalist></div>' +
+         '<div><label>Supplier email (for follow-ups)</label><input id="dEmail" type="email" value="' + esc(email) + '" placeholder="sales@supplier.co.za"></div>';
+}
+function locationsAll(){
+  var a = (D.board && D.board.locations) || [], b = (D.cons.meta && D.cons.meta.locations) || [];
+  var out = []; a.concat(b).forEach(function(l){ if(l && out.indexOf(l) < 0) out.push(l); });
+  return out.length ? out : ["Main"];
+}
+function stockOptions(sel){
+  var o = '<option value=""' + (!sel?" selected":"") + '>— Pick the board / consumable —</option><option value="none"' + (sel==="none"?" selected":"") + '>Not stock (e.g. delivery fee)</option>';
+  if(canBoard(user)) o += '<option value="new:board"' + (sel==="new:board"?" selected":"") + '>＋ New board…</option>';
+  if(canCons(user)) o += '<option value="new:cons"' + (sel==="new:cons"?" selected":"") + '>＋ New consumable…</option>';
+  if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
+  if(canCons(user)) o += '<optgroup label="Consumables">' + consItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
+  return o;
+}
+function newFieldsHtml(l){
+  var n = l.nf || {}, k = l.key;
+  function f(name, lab, val, ph){ return '<div><label>' + lab + '</label><input data-nf="' + k + '" data-f="' + name + '" value="' + esc(val||"") + '" placeholder="' + esc(ph||"") + '"></div>'; }
+  if(l.stock === "new:board") return '<div class="newf">' + f("description","Board name",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + '</div>';
+  if(l.stock === "new:cons") return '<div class="newf">' + f("name","Name",n.name,"4x30 chipboard screw") +
+    '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div>' +
+    (n.unit === "per500" ? f("bundle","Items per pack",n.bundle || "500","500") : '') + '</div>';
+  return "";
+}
+function lineCls(l){ if(!l.stock) return "check"; if(l.stock === "none") return "skip"; if(l.stock.indexOf("new:") === 0) return "new"; return (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok"; }
+function viewEdit(){
+  var d = draft, locs = locationsAll();
+  var h = '<button class="backlink" id="back">← Back</button>';
+  h += '<div class="card"><h2><span class="step">1</span>' + (d.id ? "Edit order" : "New order or quote") + '</h2>' +
+       '<div class="seg"><button type="button" data-st="quote" class="' + (d.status==="quote"?"on":"") + '">Quote (not ordered yet)</button><button type="button" data-st="ordered" class="' + (d.status!=="quote"?"on":"") + '">Order placed</button></div>' +
+       '<div class="grid2">' + supplierField(d.supplier, d.supplierEmail) +
+       '<div><label>' + (d.status === "quote" ? "Quote no." : "Order / quote no.") + '</label><input id="dRef" value="' + esc(d.ref) + '" placeholder="e.g. PO 1045 or QTE 2231"></div>' +
+       (d.status === "quote" ? '<div><label>Quote date</label><input id="dQDate" type="date" value="' + esc(d.quoteDate || today()) + '"></div>'
+                             : '<div><label>Date ordered</label><input id="dODate" type="date" value="' + esc(d.orderedDate || today()) + '"></div>') +
+       '<div><label>Deliver to</label><select id="dLoc">' + locs.map(function(l){ return '<option' + (l===d.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>' +
+       '<div><label>Notes (optional)</label><input id="dNotes" value="' + esc(d.notes) + '" placeholder="e.g. for NH Hotel job"></div></div></div>';
+  h += '<div class="card"><h2><span class="step">2</span>What was ordered</h2>' +
+       '<div class="drop" id="drop"><div><b>Upload the quotation</b> (or your order)</div><div class="small muted">PDF, photo, Excel or CSV — the lines are read for you</div>' +
+       '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
+       '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
+       '<div class="status" id="status">' + esc(statusMsg) + '</div><div class="bar' + (busy?"":" hide") + '"><i id="barI" style="width:' + Math.round(progress*100) + '%"></i></div>' +
+       (d.file || d.quoteUrl ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(d.file ? d.file.name : (d.quoteFile || "quotation")) + '</div>' : '') +
+       '<details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">Paste lines instead</summary><textarea id="pasteIn" placeholder="Paste rows from the quote or Excel"></textarea><button class="btn btn-sm" type="button" id="pasteGo" style="margin-top:8px">Read pasted lines</button></details>' +
+       '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line by hand</button></div></div>';
+  h += '<div class="card"><h2><span class="step">3</span>Check the lines</h2>';
+  if(!d.lines.length) h += '<div class="empty">Lines from the quotation show here. Link each to the board or consumable it goes into when it arrives.</div>';
+  else {
+    h += '<p class="small muted" style="margin-top:0"><span class="tag ok">matched</span> <span class="tag check">please check</span> <span class="tag new">new item</span> Amber lines without an item still need linking so the delivery goes into stock. Grey = not stock.</p><div class="lines">';
+    d.lines.forEach(function(l){
+      h += '<div class="line ' + lineCls(l) + '">' + (l.text ? '<div class="src">' + esc(l.text) + '</div>' : '<div class="newf" style="grid-template-columns:1fr;margin:0 0 8px"><div><label>Description</label><input data-text="' + l.key + '" value="' + esc(l.desc||"") + '" placeholder="What was ordered"></div></div>') +
+        '<div class="lrow"><select data-stock="' + l.key + '">' + stockOptions(l.stock) + '</select>' +
+        '<div><input type="number" inputmode="decimal" min="0" step="any" data-qty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty">' + (packSizeOf(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="pack"' + (l.per!=="each"?" selected":"") + '>packs (' + packSizeOf(l) + ')</option><option value="each"' + (l.per==="each"?" selected":"") + '>each</option></select>' : '<div class="unit">' + esc(unitOf(l)) + '</div>') + (num(l.received) ? '<div class="unit">' + l.received + ' in</div>' : '') + '</div>' +
+        '<button class="x" type="button" title="Remove line" data-del="' + l.key + '">×</button></div>' + newFieldsHtml(l) + '</div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  var n = d.lines.filter(function(l){ return num(l.qty) > 0; }).length;
+  footer('<b>' + n + '</b> line' + (n===1?"":"s") + (d.supplier ? " · " + esc(d.supplier) : ""), d.id ? "Save changes" : d.status === "quote" ? "Save quote" : "Save order", !n);
+  return h;
+}
+function viewOrder(o){
+  var lines = orderLines(o), out = orderOut(o);
+  var h = '<button class="backlink" id="back">← All orders</button>';
+  h += '<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(o.supplier) + '</h2>' + statusPill(o) + '</div>' +
+       '<div class="kv" style="margin-top:10px">' +
+       '<div>Order / quote no.</div><div>' + esc(o.ref || "—") + '</div>' +
+       (o.status === "quote" ? '<div>Quote date</div><div>' + fmtDate(o.quoteDate) + '</div>' : '<div>Ordered</div><div>' + fmtDate(o.orderedDate) + ' (' + daysSince(o.orderedDate) + ' days ago)</div>') +
+       '<div>Deliver to</div><div>' + esc(o.location || "—") + '</div>' +
+       (o.supplierEmail ? '<div>Email</div><div><a style="color:var(--amber)" href="mailto:' + esc(o.supplierEmail) + '">' + esc(o.supplierEmail) + '</a></div>' : '') +
+       (o.notes ? '<div>Notes</div><div>' + esc(o.notes) + '</div>' : '') +
+       (o.quoteUrl ? '<div>Quotation</div><div><a style="color:var(--amber)" target="_blank" rel="noopener" href="' + esc(o.quoteUrl) + '">' + esc(o.quoteFile || "open") + '</a></div>' : '') +
+       '<div>Added by</div><div>' + esc(o.createdBy || "—") + '</div></div>' +
+       '<div class="row" style="margin-top:14px">' +
+       (o.status === "quote" ? '<input type="date" id="placeDate" value="' + today() + '" style="width:auto" title="Date the order was placed"><button class="btn btn-primary" id="placeOrder">✓ Order placed</button>' : '') +
+       (isOpen(o) && out > 0 ? '<button class="btn btn-primary" id="rcvThis">📦 Receive delivery</button>' : '') +
+       ((o.status === "quote" || isOpen(o)) ? '<button class="btn" id="editOrder">Edit</button>' : '') +
+       (isOpen(o) && out > 0 ? '<button class="btn" id="closeOrder">Close — rest not coming</button>' : '') +
+       ((o.status === "closed" || o.status === "received") && out > 0 ? '<button class="btn" id="reopen">Reopen</button>' : '') +
+       (o.status === "quote" || user.isRoot ? '<button class="btn" id="delOrder" style="color:#E39A80">Delete</button>' : '') + '</div></div>';
+  h += '<div class="card"><h2>Lines</h2><div style="overflow-x:auto"><table class="ol"><thead><tr><th>Item</th><th class="n">Ordered</th><th class="n">Received</th><th class="n">Still to come</th></tr></thead><tbody>' +
+    lines.map(function(l){ var ot = outstanding(l);
+      return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + '<div class="sub">→ ' + esc(stockLabel(l)) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td><td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
+    '</tbody></table></div></div>';
+  var dels = list(o.deliveries).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); });
+  h += '<div class="card"><h2>Deliveries</h2>' + (dels.length ? '<ul class="hist">' + dels.map(function(d){ var t = new Date(d.ts);
+      return '<li><b>' + t.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }) + '</b> ' + t.toLocaleTimeString("en-ZA", { hour:"2-digit", minute:"2-digit" }) + (d.docRef ? " · " + esc(d.docRef) : "") + ' · ' + esc(d.user || "") + (d.location ? " · " + esc(d.location) : "") +
+        (d.fileUrl ? ' · <a href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">delivery note</a>' : '') +
+        '<div class="muted small">' + list(d.lines).map(function(x){ return esc(x.qty + " × " + (x.item || "")); }).join("<br>") + '</div></li>'; }).join("") + '</ul>' : '<div class="empty">Nothing delivered yet.</div>') + '</div>';
+  footer(null);
+  return h;
+}
+
+// ---------- receiving ----------
+function openLinesFor(supplier, onlyId){
+  var key = String(supplier||"").trim().toLowerCase(), out = [];
+  ordersArr().filter(function(o){ return isOpen(o) && (onlyId ? o.id === onlyId : String(o.supplier||"").trim().toLowerCase() === key); })
+    .sort(function(a,b){ return String(a.orderedDate).localeCompare(String(b.orderedDate)); })
+    .forEach(function(o){ orderLines(o).forEach(function(l){ if(outstanding(l) > 0) out.push({ id:o.id + "|" + l.lid, oid:o.id, lid:l.lid, order:o, line:l,
+      label:(l.desc || l.text || stockLabel(l)).slice(0, 70) + " — " + outstanding(l) + " " + unitOf(l) + " to come" + (o.ref ? " (" + o.ref + ")" : ""),
+      code:l.code || "", desc:l.desc || "", size:l.size || "", text:[l.code, l.desc || l.text, l.size, stockLabel(l)].join(" ") }); }); });
+  return out;
+}
+function startReceive(supplier, orderId){
+  var o = orderId ? D.orders[orderId] : null;
+  rcv = { supplier: o ? o.supplier : (supplier || ""), orderId: orderId || null, location: (o && o.location) || locationsAll()[0], docRef:"", file:null, lines:[] };
+  ui.view = "receive"; render(); window.scrollTo(0, 0);
+}
+function addRcvLines(raw, source){
+  if(!raw.length){ toast("No lines with a quantity found in that " + source + ".", "err"); return; }
+  var cands = openLinesFor(rcv.supplier, rcv.orderId);
+  var its = cands.map(function(c){ return { id:c.id, code:c.code, desc:c.desc, size:c.size, text:c.text }; });
+  var cc = {}; raw.forEach(function(l){ var c = L.norm(l.code); if(c) cc[c] = (cc[c]||0) + 1; });
+  var got = 0;
+  raw.forEach(function(l){
+    var m = L.matchLine(l, its, {}, {});
+    var match = m.itemId || "", how = m.how, score = m.score;
+    if(!match){
+      // compare the wording and sizes with each open order line (prices and quantities ignored)
+      var best = null, bs = 0, second = 0;
+      cands.forEach(function(c){ var sc = rcvScore(l, c.line); if(sc > bs){ second = bs; bs = sc; best = c; } else if(sc > second) second = sc; });
+      if(best && bs >= 0.6 && (bs - second > 0.05 || cands.length === 1)){ match = best.id; how = "fuzzy"; score = bs >= 0.9 ? 0.9 : bs; }
+    }
+    if(!match){
+      // try via the stock item: supplier wording learned in Stock In → board/consumable → the order line for it
+      var s = matchStock(l, L.norm(l.code) && cc[L.norm(l.code)] === 1);
+      var c = s.score >= 0.75 && cands.find(function(x){ return x.line.stock === s.id; });
+      if(c){ match = c.id; how = "stock"; score = s.score; }
+    }
+    if(match) got++;
+    rcv.lines.push({ key:++seq, src:l, qty:num(l.qty), match:match, how:how, score:score });
+  });
+  toast("Read " + raw.length + " line" + (raw.length===1?"":"s") + " — " + got + " matched to the order. Check them below.", "ok");
+}
+function wordsNums(str){
+  var t = L.tokens(str || ""), w = [], n = [];
+  t.forEach(function(x){ if(/^\d+(\.\d+)?$/.test(x)) { if(n.indexOf(x) < 0) n.push(x); } else if(x.length > 1 && w.indexOf(x) < 0) w.push(x); });
+  return { w:w, n:n };
+}
+function rcvScore(src, line){
+  if(src.code && line.code && L.norm(src.code) === L.norm(line.code)) return 1;
+  var a = wordsNums([src.code, src.desc || src.text].join(" ")), b = wordsNums([line.code, line.desc || line.text].join(" "));
+  if(!a.w.length || !b.w.length) return 0;
+  var inter = a.w.filter(function(x){ return b.w.indexOf(x) >= 0; }).length;
+  var words = 2 * inter / (a.w.length + b.w.length);
+  var nums = !a.n.length && !b.n.length ? 1 : (!a.n.length || !b.n.length) ? 0.5 : a.n.filter(function(x){ return b.n.indexOf(x) >= 0; }).length / Math.max(a.n.length, b.n.length);
+  return words * 0.6 + nums * 0.4;
+}
+function fillAllOutstanding(){
+  rcv.lines = openLinesFor(rcv.supplier, rcv.orderId).map(function(c){ return { key:++seq, src:{ text:"" }, qty:outstanding(c.line), match:c.id, how:"picked", score:1 }; });
+}
+function viewReceive(){
+  var r = rcv, sups = Array.from(new Set(ordersArr().filter(isOpen).filter(function(o){ return orderOut(o) > 0; }).map(function(o){ return o.supplier; }))).sort();
+  var cands = r.supplier ? openLinesFor(r.supplier, r.orderId) : [];
+  var h = '<button class="backlink" id="back">← Back</button>';
+  h += '<div class="card"><h2><span class="step">1</span>Receive a delivery</h2><div class="grid2">' +
+       '<div><label>Supplier</label><select id="rSup"><option value="">— pick —</option>' + sups.map(function(s){ return '<option' + (s===r.supplier?" selected":"") + '>' + esc(s) + '</option>'; }).join("") + '</select></div>' +
+       '<div><label>Delivered to</label><select id="rLoc">' + locationsAll().map(function(l){ return '<option' + (l===r.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>' +
+       '<div><label>Delivery note no. (optional)</label><input id="rRef" value="' + esc(r.docRef) + '" placeholder="e.g. DN 55120"></div>' +
+       (r.orderId ? '<div><label>Order</label><div class="small" style="padding-top:8px">' + esc(D.orders[r.orderId] ? (D.orders[r.orderId].ref || "this order") : "") + ' <button class="backlink" id="allOrders" style="margin:0 0 0 8px">use all open orders</button></div></div>' : '') +
+       '</div>' + (!sups.length ? '<p class="small muted">There are no open orders waiting for deliveries. For stock that wasn\'t ordered, use Stock In.</p>' : '') + '</div>';
+  if(r.supplier){
+    h += '<div class="card"><h2><span class="step">2</span>Scan the delivery note</h2>' +
+       '<div class="drop" id="drop"><div><b>Drop or photograph the delivery note</b></div><div class="small muted">PDF, photo, Excel or CSV</div>' +
+       '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
+       '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
+       '<div class="status" id="status">' + esc(statusMsg) + '</div><div class="bar' + (busy?"":" hide") + '"><i id="barI" style="width:' + Math.round(progress*100) + '%"></i></div>' +
+       (r.file ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(r.file.name) + '</div>' : '') +
+       '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="allCame">✓ Everything outstanding arrived</button><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line</button></div></div>';
+    h += '<div class="card"><h2><span class="step">3</span>Check what arrived</h2>';
+    if(!r.lines.length) h += '<div class="empty">' + cands.length + ' line' + (cands.length===1?"":"s") + ' still to come from ' + esc(r.supplier) + '. Scan the delivery note, or tap “Everything outstanding arrived”.</div>';
+    else {
+      h += '<p class="small muted" style="margin-top:0">Each line is ticked off its order and added to Board Stock or Consumables at <b>' + esc(r.location) + '</b>. Grey lines are skipped.</p><div class="lines">';
+      r.lines.forEach(function(l){
+        var c = cands.find(function(x){ return x.id === l.match; });
+        var cls = !l.match || l.skip ? "skip" : (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok";
+        h += '<div class="line ' + cls + '">' + (l.src && l.src.text ? '<div class="src">' + esc(l.src.text) + '</div>' : '') +
+          '<div class="lrow r"><select data-rmatch="' + l.key + '"><option value="">— Not on the order / skip —</option>' + cands.map(function(x){ return '<option value="' + esc(x.id) + '"' + (x.id===l.match?" selected":"") + '>' + esc(x.label) + '</option>'; }).join("") + '</select>' +
+          '<div><input type="number" inputmode="decimal" min="0" step="any" data-rqty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty"><div class="unit">' + esc(c ? unitOf(c.line) : "") + '</div></div>' +
+          '<button class="x" type="button" title="Remove line" data-rdel="' + l.key + '">×</button></div>' +
+          (c ? '<div class="sub">→ ' + esc(stockLabel(c.line)) + (num(l.qty) > outstanding(c.line) ? ' · <span style="color:var(--amber)">more than the ' + outstanding(c.line) + ' still to come</span>' : '') + '</div>' : '') + '</div>';
+      });
+      h += '</div><p class="small muted">Something on the note that wasn\'t ordered? Add it with Stock In afterwards.</p>';
+    }
+    h += '</div>';
+  }
+  var ready = rcvReady();
+  footer(r.lines.length ? '<b>' + ready.length + '</b> of ' + r.lines.length + ' line' + (r.lines.length===1?"":"s") + ' ready' : null, "Receive & add to stock", !ready.length);
+  return h;
+}
+function rcvReady(){ return rcv ? rcv.lines.filter(function(l){ return !l.skip && l.match && num(l.qty) > 0; }) : []; }
+
+// ---------- saving ----------
+function freshUser(next){
+  var f = S.resolve(core.getUsers());
+  if(f.status !== "ok"){ S.goHome({ next:"orders" }); return null; }
+  user = f.user; return user;
+}
+async function saveDraft(){
+  var d = draft;
+  d.supplier = (document.getElementById("dSup") || {}).value || d.supplier || "";
+  d.supplier = d.supplier.trim();
+  if(!d.supplier){ toast("Enter the supplier.", "err"); return; }
+  var lines = d.lines.filter(function(l){ return num(l.qty) > 0; });
+  if(!lines.length){ toast("Add at least one line with a quantity.", "err"); return; }
+  for(var i = 0; i < lines.length; i++){ var l = lines[i];
+    if(l.stock === "new:board" && !(l.nf && l.nf.description)) { toast("Give the new board a name.", "err"); return; }
+    if(l.stock === "new:cons" && !(l.nf && l.nf.name)) { toast("Give the new consumable a name.", "err"); return; }
+    if(!l.text && !l.desc && !l.stock){ toast("A hand-typed line needs a description or a stock item.", "err"); return; }
+  }
+  var unlinked = lines.filter(function(l){ return !l.stock; }).length;
+  if(unlinked && !confirm(unlinked + " line" + (unlinked===1?" isn't":"s aren't") + " linked to a board or consumable yet, so " + (unlinked===1?"it":"they") + " won't go into stock when delivered. Save anyway? (You can link them later with Edit.)")) return;
+  if(!freshUser()) return;
+  busy = true; render();
+  try{
+    var id = d.id || uid(), old = d.id ? D.orders[d.id] : null;
+    var quoteUrl = d.file ? await uploadDoc("orderDocs", id, d.file) : (d.quoteUrl || "");
+    var o = old ? JSON.parse(JSON.stringify(old)) : { created:new Date().toISOString(), createdBy:user.username, deliveries:{} };
+    delete o.id;
+    o.supplier = d.supplier; o.supplierEmail = d.supplierEmail || ""; o.ref = d.ref || ""; o.location = d.location; o.notes = d.notes || "";
+    o.status = d.status === "quote" ? "quote" : (old && isOpen(old) ? old.status : "ordered");
+    if(d.status === "quote") o.quoteDate = d.quoteDate || today(); else o.orderedDate = d.orderedDate || today();
+    if(quoteUrl){ o.quoteUrl = quoteUrl; o.quoteFile = d.file ? d.file.name : (d.quoteFile || ""); }
+    o.lines = {};
+    lines.forEach(function(l, n){
+      var lid = l.lid || uid() + n, st = stockById(l.stock);
+      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: packSizeOf(l) ? (l.per || "pack") : "" };
+      if(l.nf && l.stock && l.stock.indexOf("new:") === 0) o.lines[lid].nf = l.nf;
+    });
+    if(o.status === "part" && orderOut(o) === 0) o.status = "received";
+    await db.ref("orders/list/" + id).set(o);
+    D.orders[id] = JSON.parse(JSON.stringify(o));
+    // remember supplier wording → stock item, same memory Stock In uses
+    var upd = { board:{}, consumables:{} };
+    lines.forEach(function(l){ if(!l.stock || l.stock === "none" || l.stock.indexOf("new:") === 0 || !l.text) return; var t = targetOf(l.stock), k = L.aliasKey(l);
+      if(k) upd[t][fbKey(k)] = { itemId:l.stock.replace(/^[bc]:/, ""), text:String(l.text).slice(0,160) }; });
+    for(var t in upd) if(Object.keys(upd[t]).length) await db.ref("stockIn/aliases/" + t).update(upd[t]);
+    toast((d.status === "quote" ? "Quote" : "Order") + " saved.", "ok");
+    draft = null; ui.view = "order"; ui.orderId = id;
+  }catch(e){ console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
+  busy = false; render();
+}
+function sameBoard(b, n){ return String(b.description||"").trim().toLowerCase() === String(n.description||"").trim().toLowerCase() && String(b.category||"").trim().toLowerCase() === String(n.category||"").trim().toLowerCase(); }
+function newBoardCode(boards, desc){
+  var k = String(desc||"").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 10), base = k ? "B" + k : "BOARD", code = base, i = 2;
+  while(list(boards).some(function(b){ return b.code === code; })) code = base + "-" + (i++);
+  return code;
+}
+async function addBoards(items, loc, who, reason){
+  if(!items.length) return;
+  var res = await db.ref("boardStock").transaction(function(cur){
+    if(!cur) return;
+    cur.boards = list(cur.boards); cur.log = list(cur.log);
+    var locs = (cur.locations && cur.locations.length) ? cur.locations : ["Main"], ts = new Date().toISOString();
+    items.forEach(function(x){
+      var q = Math.round(x.qty), b;
+      if(x.stock === "new:board"){
+        b = cur.boards.find(function(y){ return sameBoard(y, x.nf); });
+        if(!b){ b = { code:newBoardCode(cur.boards, x.nf.description), description:x.nf.description, category:x.nf.category||"", unit:"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId:"" }; cur.boards.push(b); }
+      } else b = cur.boards.find(function(y){ return y.code === x.stock.slice(2); });
+      if(!b) throw new Error("A board on this order was deleted in Board Stock — edit the order and pick it again.");
+      x.newStock = "b:" + b.code;
+      if(typeof b.qty === "number"){ var o = {}; o[locs[0]] = b.qty; b.qty = o; }
+      if(!b.qty || typeof b.qty !== "object") b.qty = {};
+      b.qty[loc] = (Number(b.qty[loc])||0) + q;
+      var total = Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0);
+      b.reorderNotified = total <= (Number(b.reorderLevel)||0);
+      cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason });
+    });
+    return cur;
+  });
+  if(!res.committed) throw new Error("Board Stock didn't load — check your connection and try again.");
+}
+async function addCons(items, loc){
+  var base = "consumablesStock/";
+  for(var i = 0; i < items.length; i++){
+    var x = items[i], q = x.sq;
+    if(x.stock === "new:cons"){
+      var nid = uid(), qb = {};
+      var rec = { size:x.nf.name, unit:x.nf.unit||"each", qtyByLocation:qb, reorderQty:0, reorderSent:false, supplierId:"" };
+      if(rec.unit === "per500") rec.bundleSize = parseInt(x.nf.bundle) || 500;
+      qb[loc] = rec.unit === "per500" ? q : Math.round(q);
+      await db.ref(base + "screwItems/" + nid).set(rec);
+      x.newStock = "c:s:" + nid; continue;
+    }
+    var parts = x.stock.split(":"), kind = parts[1], rid = parts.slice(2).join(":");
+    if(kind === "s") await db.ref(base + "screwItems/" + rid + "/qtyByLocation/" + fbKey(loc)).transaction(function(v){ return (Number(v)||0) + q; });
+    else if(kind === "l") await db.ref(base + "consumableTypes/" + rid + "/volumeByLocation/" + fbKey(loc)).transaction(function(v){ return (Number(v)||0) + Math.round(q*1000); });
+    else { var n2 = Math.round(q), d = today(), upd = {}; for(var k = 0; k < n2; k++) upd[uid() + k] = { typeId:rid, fillLevel:"Full", createdDate:d, location:loc }; await db.ref(base + "consumableUnits").update(upd); }
+    x.newStock = x.stock;
+  }
+}
+async function saveReceive(){
+  var r = rcv, ready = rcvReady();
+  if(!ready.length){ toast("Nothing to receive yet.", "err"); return; }
+  if(!freshUser()) return;
+  var cands = openLinesFor(r.supplier, r.orderId);
+  var items = [];
+  for(var i = 0; i < ready.length; i++){
+    var c = cands.find(function(x){ return x.id === ready[i].match; });
+    if(!c){ toast("One of the order lines was already received — refresh and try again.", "err"); return; }
+    var t = targetOf(c.line.stock);
+    if(t === "board" && !canBoard(user)){ toast("You can't add to Board Stock — ask Sean for \"Add stock\" there.", "err"); return; }
+    if(t === "consumables" && !canCons(user)){ toast("You can't add to Consumables — ask Sean for access.", "err"); return; }
+    items.push({ c:c, t:t, qty:num(ready[i].qty), sq:toStockQty(c.line, num(ready[i].qty)), stock:c.line.stock || "", nf:c.line.nf || null, src:ready[i].src });
+  }
+  var who = user.username, loc = r.location, did = uid();
+  var byOrder = {}; items.forEach(function(x){ (byOrder[x.c.oid] = byOrder[x.c.oid] || []).push(x); });
+  var refs = Object.keys(byOrder).map(function(oid){ return D.orders[oid].ref; }).filter(Boolean).join(", ");
+  var reason = "Order delivery" + (r.docRef ? " " + r.docRef : "") + " from " + r.supplier + (refs ? " (" + refs + ")" : "") + " (" + loc + ")";
+  if(!confirm("Receive " + items.length + " line" + (items.length===1?"":"s") + " from " + r.supplier + " into stock at " + loc + "?")) return;
+  busy = true; render();
+  try{
+    await addBoards(items.filter(function(x){ return x.t === "board"; }), loc, who, reason);
+    await addCons(items.filter(function(x){ return x.t === "consumables"; }), loc);
+    var fileUrl = r.file ? await uploadDoc("orderDocs", did, r.file) : "";
+    var ts = new Date().toISOString();
+    for(var oid in byOrder){
+      var its = byOrder[oid];
+      var res = await db.ref("orders/list/" + oid).transaction(function(o){
+        if(!o) return;
+        its.forEach(function(x){ var l = o.lines && o.lines[x.c.lid]; if(!l) return;
+          l.received = r2(num(l.received) + x.qty);
+          if(x.newStock && x.newStock !== l.stock){ l.stock = x.newStock; delete l.nf; } });
+        o.deliveries = o.deliveries || {};
+        o.deliveries[did] = { ts:ts, user:who, docRef:r.docRef || "", location:loc, fileUrl:fileUrl, fileName: r.file ? r.file.name : "",
+          lines: its.map(function(x){ return { lid:x.c.lid, qty:x.qty, item:(x.c.line.desc || x.c.line.text || stockLabel(x.c.line)).slice(0,80) }; }) };
+        var left = Object.keys(o.lines||{}).some(function(k){ return num(o.lines[k].qty) - num(o.lines[k].received) > 0.0001; });
+        o.status = left ? "part" : "received";
+        return o;
+      });
+      if(!res.committed) throw new Error("The order didn't update — check your connection.");
+    }
+    // learn the delivery note wording for next time (Stock In uses the same memory)
+    var upd = { board:{}, consumables:{} };
+    items.forEach(function(x){ var s = x.newStock || x.stock; if(!s || !x.src || !x.src.text) return; var k = L.aliasKey(x.src);
+      if(k) upd[x.t][fbKey(k)] = { itemId:s.replace(/^[bc]:/, ""), text:String(x.src.text).slice(0,160) }; });
+    for(var t in upd) if(Object.keys(upd[t]).length) await db.ref("stockIn/aliases/" + t).update(upd[t]);
+    await db.ref("stockIn/receipts/" + did).set({ ts:ts, user:who, target: items.every(function(x){ return x.t === "board"; }) ? "board" : "consumables", location:loc, supplier:r.supplier,
+      docRef:(r.docRef || "") + (refs ? " · order " + refs : ""), fileName: r.file ? r.file.name : "", fileUrl:fileUrl,
+      lines: items.filter(function(x){ return x.t; }).map(function(x){ return { item:stockLabel({ stock:x.newStock || x.stock, nf:x.nf }), qty:x.qty, unit:unitOf(x.c.line) }; }) });
+    toast("Received " + items.length + " line" + (items.length===1?"":"s") + " — stock updated.", "ok");
+    var single = Object.keys(byOrder).length === 1 ? Object.keys(byOrder)[0] : null;
+    rcv = null; ui.view = single ? "order" : "list"; ui.orderId = single;
+  }catch(e){ console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
+  busy = false; render();
+}
+async function setStatus2(o, status, extra){
+  if(!freshUser()) return;
+  var u = Object.assign({ status:status }, extra || {});
+  try{ await db.ref("orders/list/" + o.id).update(u); toast("Saved.", "ok"); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+}
+
+// ---------- events ----------
+function editOrder(o){
+  draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
+    location:o.location || locationsAll()[0], notes:o.notes||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
+    lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), stock:l.stock||"", nf:l.nf||null, per:l.per||"", how:"picked", score:1 }; }) }
+    : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:locationsAll()[0], notes:"", file:null, lines:[] };
+  ui.view = "edit"; render(); window.scrollTo(0, 0);
+}
+function readDraftFields(){
+  var g = function(id){ var e = document.getElementById(id); return e ? e.value : undefined; };
+  if(!draft) return;
+  if(g("dSup") !== undefined) draft.supplier = g("dSup");
+  if(g("dEmail") !== undefined) draft.supplierEmail = g("dEmail").trim();
+  if(g("dRef") !== undefined) draft.ref = g("dRef").trim();
+  if(g("dQDate") !== undefined) draft.quoteDate = g("dQDate");
+  if(g("dODate") !== undefined) draft.orderedDate = g("dODate");
+  if(g("dLoc") !== undefined) draft.location = g("dLoc");
+  if(g("dNotes") !== undefined) draft.notes = g("dNotes");
+}
+function bindFileInputs(onFile){
+  var q = function(s){ return document.querySelector(s); };
+  var fi = q("#fileIn"), ci = q("#camIn");
+  if(q("#pick")) q("#pick").onclick = function(e){ e.stopPropagation(); fi.click(); };
+  if(q("#snap")) q("#snap").onclick = function(e){ e.stopPropagation(); ci.click(); };
+  [fi, ci].forEach(function(inp){ if(inp) inp.onchange = function(){ if(inp.files[0]) onFile(inp.files[0]); inp.value = ""; }; });
+  var dz = q("#drop");
+  if(dz){
+    dz.onclick = function(){ fi.click(); };
+    dz.ondragover = function(e){ e.preventDefault(); dz.classList.add("over"); };
+    dz.ondragleave = function(){ dz.classList.remove("over"); };
+    dz.ondrop = function(e){ e.preventDefault(); dz.classList.remove("over"); var f = e.dataTransfer.files[0]; if(f) onFile(f); };
+  }
+}
+function bind(){
+  var q = function(s){ return document.querySelector(s); }, qa = function(s){ return document.querySelectorAll(s); };
+  if(q("#back")) q("#back").onclick = function(){
+    if(ui.view === "edit" && draft && draft.lines.length && !confirm("Leave without saving?")) return;
+    if(ui.view === "receive" && rcv && rcv.lines.length && !confirm("Leave without receiving?")) return;
+    var backTo = (ui.view === "edit" && draft && draft.id) ? "order" : (ui.view === "receive" && rcv && rcv.orderId) ? "order" : "list";
+    if(ui.view === "receive" && rcv && rcv.orderId) ui.orderId = rcv.orderId;
+    draft = null; rcv = null; ui.view = backTo; render();
+  };
+  // list
+  if(q("#newOrder")) q("#newOrder").onclick = function(){ editOrder(null); };
+  if(q("#rcvAny")) q("#rcvAny").onclick = function(){ startReceive("", null); };
+  qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
+  if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
+  qa("[data-open]").forEach(function(c){ c.onclick = function(){ ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
+  // order detail
+  var o = ui.view === "order" ? D.orders[ui.orderId] : null;
+  if(o){
+    o.id = ui.orderId;
+    if(q("#placeOrder")) q("#placeOrder").onclick = function(){ var d = (q("#placeDate") || {}).value || today(); setStatus2(o, "ordered", { orderedDate:d }); };
+    if(q("#rcvThis")) q("#rcvThis").onclick = function(){ startReceive(o.supplier, o.id); };
+    if(q("#editOrder")) q("#editOrder").onclick = function(){ editOrder(o); };
+    if(q("#closeOrder")) q("#closeOrder").onclick = function(){ if(confirm("Close this order? The " + orderOut(o) + " item(s) still to come are marked as not coming and it drops off the Monday/Wednesday check.")) setStatus2(o, "closed", { closedBy:user.username, closedAt:new Date().toISOString() }); };
+    if(q("#reopen")) q("#reopen").onclick = function(){ setStatus2(o, list(o.deliveries).length ? "part" : "ordered"); };
+    if(q("#delOrder")) q("#delOrder").onclick = async function(){ if(!confirm("Delete this " + (o.status === "quote" ? "quote" : "order") + "? Stock already received stays in stock.")) return;
+      if(!freshUser()) return; try{ await db.ref("orders/list/" + o.id).remove(); ui.view = "list"; toast("Deleted.", "ok"); render(); }catch(e){ toast("Couldn't delete: " + (e.message || e), "err"); } };
+  }
+  // edit
+  if(ui.view === "edit" && draft){
+    ["dSup","dEmail","dRef","dQDate","dODate","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
+    if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; q("#dEmail").value = s.email; } };
+    qa("[data-st]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.status = b.getAttribute("data-st"); render(); }; });
+    bindFileInputs(function(f){ readDraftFields(); draft.file = f; readInto(f, function(raw){ addDraftLines(raw, "file"); }); });
+    if(q("#pasteGo")) q("#pasteGo").onclick = function(){ readDraftFields(); addDraftLines(L.linesFromText(q("#pasteIn").value), "pasted text"); render(); };
+    if(q("#addBlank")) q("#addBlank").onclick = function(){ readDraftFields(); draft.lines.push({ key:++seq, text:"", code:"", desc:"", size:"", qty:0, received:0, stock:"", how:"picked", score:1 }); render(); };
+    qa("[data-stock]").forEach(function(s){ s.onchange = function(){ readDraftFields(); var l = draftLine(s.getAttribute("data-stock")); l.stock = s.value; l.how = "picked"; l.score = 1;
+      if(l.stock === "new:board" && !l.nf) l.nf = { description:l.desc || l.text || "", category:l.size || "" };
+      if(l.stock === "new:cons" && !l.nf) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), unit:"each" };
+      l.per = guessPer(l);
+      render(); }; });
+    qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; }; });
+    qa("[data-qty]").forEach(function(inp){ inp.oninput = function(){ draftLine(inp.getAttribute("data-qty")).qty = num(inp.value); }; inp.onchange = function(){ readDraftFields(); render(); }; });
+    qa("[data-text]").forEach(function(inp){ inp.oninput = function(){ draftLine(inp.getAttribute("data-text")).desc = inp.value; }; });
+    qa("[data-del]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.lines = draft.lines.filter(function(l){ return String(l.key) !== b.getAttribute("data-del"); }); render(); }; });
+    qa("[data-nf]").forEach(function(inp){ var h = function(){ var l = draftLine(inp.getAttribute("data-nf")); l.nf = l.nf || {}; l.nf[inp.getAttribute("data-f")] = inp.value.trim(); return l; }; inp.oninput = h;
+      inp.onchange = function(){ var l = h(); if(inp.tagName === "SELECT" || inp.getAttribute("data-f") === "bundle"){ if(!l.per) l.per = guessPer(l); readDraftFields(); render(); } }; });
+  }
+  // receive
+  if(ui.view === "receive" && rcv){
+    if(q("#rSup")) q("#rSup").onchange = function(){ if(rcv.lines.length && !confirm("Changing supplier clears the lines below. Carry on?")){ this.value = rcv.supplier; return; } rcv.supplier = this.value; rcv.orderId = null; rcv.lines = []; render(); };
+    if(q("#rLoc")) q("#rLoc").onchange = function(){ rcv.location = this.value; render(); };
+    if(q("#rRef")) q("#rRef").oninput = function(){ rcv.docRef = this.value.trim(); };
+    if(q("#allOrders")) q("#allOrders").onclick = function(){ rcv.orderId = null; render(); };
+    bindFileInputs(function(f){ rcv.file = f; readInto(f, function(raw){ addRcvLines(raw, "delivery note"); }); });
+    if(q("#allCame")) q("#allCame").onclick = function(){ if(rcv.lines.length && !confirm("Replace the lines below with everything still to come?")) return; fillAllOutstanding(); render(); };
+    if(q("#addBlank")) q("#addBlank").onclick = function(){ rcv.lines.push({ key:++seq, src:{ text:"" }, qty:0, match:"", how:"picked", score:1 }); render(); };
+    qa("[data-rmatch]").forEach(function(s){ s.onchange = function(){ var l = rcvLine(s.getAttribute("data-rmatch")); l.match = s.value; l.how = "picked"; l.skip = !s.value;
+      if(l.match && !num(l.qty)){ var c = openLinesFor(rcv.supplier, rcv.orderId).find(function(x){ return x.id === l.match; }); if(c) l.qty = outstanding(c.line); }
+      render(); }; });
+    qa("[data-rqty]").forEach(function(inp){ inp.oninput = function(){ var l = rcvLine(inp.getAttribute("data-rqty")); l.qty = num(inp.value); if(l.qty > 0 && l.match) l.skip = false; }; inp.onchange = function(){ render(); }; });
+    qa("[data-rdel]").forEach(function(b){ b.onclick = function(){ rcv.lines = rcv.lines.filter(function(l){ return String(l.key) !== b.getAttribute("data-rdel"); }); render(); }; });
+  }
+}
+function draftLine(k){ return draft.lines.find(function(l){ return String(l.key) === String(k); }); }
+function rcvLine(k){ return rcv.lines.find(function(l){ return String(l.key) === String(k); }); }
+document.getElementById("commit").onclick = function(){
+  if(busy) return;
+  if(ui.view === "edit" && draft){ readDraftFields(); saveDraft(); }
+  else if(ui.view === "receive" && rcv) saveReceive();
+};
+
+// ---------- start ----------
+var started = false;
+function start(){
+  if(started) return; started = true;
+  db = firebase.database();
+  var rr = function(){ if(!busy) render(); };
+  db.ref("boardStock").on("value", function(s){ D.board = s.val() || { boards:[], locations:["Main"] }; rr(); });
+  ["screwItems","consumableTypes","suppliers","meta"].forEach(function(k){
+    db.ref("consumablesStock/" + k).on("value", function(s){ D.cons[{ screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]] = s.val() || {}; rr(); });
+  });
+  db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
+  db.ref("orders/list").on("value", function(s){ D.orders = s.val() || {}; D.loaded = true;
+    // don't redraw under someone typing in a form
+    if(ui.view === "list" || ui.view === "order") rr(); });
+  var h = (location.hash || "").slice(1);
+  if(h.indexOf("order=") === 0){ ui.view = "order"; ui.orderId = decodeURIComponent(h.slice(6)); }
+  render();
+}
+try{
+  core.init();
+  core.startUsersSync(function(users){
+    var r = S.resolve(users);
+    if(r.status === "wait") return;
+    if(r.status !== "ok"){ S.goHome({ next:"orders" }); return; }
+    user = r.user;
+    document.getElementById("who").textContent = user.username;
+    start();
+    if(!busy && (ui.view === "list" || ui.view === "order")) render();
+  });
+}catch(e){
+  document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>';
+}
+if(!S.get()) S.goHome({ next:"orders" });
+})();
+</script>
+</body>
+</html>
