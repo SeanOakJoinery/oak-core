@@ -622,14 +622,17 @@ function imageToCanvas(file){
   });
 }
 // Returns the lines found in a PDF / photo / Excel file (same reader as Stock In).
+var docText = "";
 async function readDoc(file){
   var name = file.name || "file", lower = name.toLowerCase();
+  docText = "";
   if(/\.(xlsx|xls|xlsm|csv)$/.test(lower)){
     setStatus("Reading " + name + "…", 0.3);
     var wb = XLSX.read(await file.arrayBuffer(), { type:"array" }), raw = [];
     wb.SheetNames.forEach(function(sn){
       var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"", raw:true });
       var t = L.linesFromTable(rows);
+      docText += rows.map(function(r){ return r.join("  "); }).join("\n") + "\n";
       raw = raw.concat(t || L.linesFromText(rows.map(function(r){ return r.join("  "); }).join("\n")));
     });
     return raw;
@@ -653,10 +656,12 @@ async function readDoc(file){
         text += await ocr(c, "page " + q) + "\n";
       }
     }
+    docText = text;
     return table.length ? table : L.linesFromDoc(text);
   }
   if(/^image\//.test(file.type) || /\.(jpe?g|png|heic|webp)$/.test(lower)){
-    return L.linesFromDoc(await ocr(await imageToCanvas(file), "photo"));
+    docText = await ocr(await imageToCanvas(file), "photo");
+    return L.linesFromDoc(docText);
   }
   throw new Error("That file type isn't supported. Use a PDF, photo, Excel or CSV file.");
 }
@@ -672,6 +677,62 @@ async function uploadDoc(folder, id, file){
     var ref = firebase.storage().ref(folder + "/" + id + "-" + file.name.replace(/[^\w.\-]+/g, "_"));
     await ref.put(file); return await ref.getDownloadURL();
   }catch(e){ console.warn("doc upload", e); return ""; }
+}
+// ---------- reading the supplier and document number off a quote / delivery note ----------
+var SUP_STOP = { pty:1, ltd:1, limited:1, cc:1, the:1, and:1, sa:1, south:1, africa:1, co:1, company:1, inc:1, ta:1, of:1, group:1, holdings:1, trading:0 };
+function plain(t){ return " " + String(t || "").toLowerCase().replace(/[^a-z0-9@.]+/g, " ").replace(/\s+/g, " ") + " "; }
+function supKeys(name){ return plain(name).trim().split(" ").filter(function(w){ return w.length >= 3 && !SUP_STOP[w] && !/^\d+$/.test(w); }); }
+function isUs(t){ return /oak\s*joinery/i.test(t || ""); }
+// Best known supplier named in the text (by email domain or by the words of its name).
+function detectSupplier(text, cands){
+  var T = plain(text), best = null, bs = 0;
+  (cands || []).forEach(function(c){
+    if(!c || !c.name || isUs(c.name)) return;
+    var sc = 0, dom = String(c.email || "").toLowerCase().split("@")[1];
+    if(dom && dom.length > 4 && T.indexOf(dom) >= 0) sc = 1;
+    else {
+      var k = supKeys(c.name); if(!k.length) return;
+      var hits = k.filter(function(w){ return T.indexOf(" " + w + " ") >= 0; }).length;
+      if(hits === k.length) sc = 0.9 + Math.min(k.length, 5) / 100;
+      else if(hits >= 2 && hits / k.length >= 0.6) sc = 0.6 + hits / 100;
+    }
+    if(sc > bs){ bs = sc; best = c; }
+  });
+  return bs >= 0.6 ? best : null;
+}
+// A company name printed near the top that isn't us, e.g. "Jamac Technological Industries CC".
+function guessSupplierName(text){
+  var lines = String(text || "").split(/\n/).slice(0, 25);
+  for(var i = 0; i < lines.length; i++){
+    var ln = lines[i].replace(/\s{2,}.*$/, "").trim();
+    if(!ln || isUs(ln)) continue;
+    var m = ln.match(/^(.{2,60}?\b(?:\(pty\)\s*ltd|pty\s*ltd|\(pty\)|limited|ltd|cc))\b/i);
+    if(m && !/\b(bank|account|reg|vat|invoice|quot)/i.test(m[1])) return m[1].replace(/\s+/g, " ").trim();
+  }
+  return "";
+}
+function guessEmail(text){
+  var all = String(text || "").match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || [];
+  return all.find(function(e){ return !/oakjoinery/i.test(e); }) || "";
+}
+function detectRef(text, kind){
+  var t = String(text || "");
+  var pats = kind === "quote"
+    ? [/\b(?:quot(?:e|ation)|qte|quo)\s*(?:no\.?|number|nr|#)?\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i, /\b((?:QU|QUO|QTE|SOQ)[-\s]?\d{3,}[\w-]*)\b/]
+    : [/\b(?:delivery\s*note|d\/n|tax\s*invoice|invoice|inv)\s*(?:no\.?|number|nr|#)?\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i, /\b((?:IN|INV|DN|SO)[-\s]?\d{4,}[\w-]*)\b/];
+  for(var i = 0; i < pats.length; i++){ var m = t.match(pats[i]); if(m && m[1] && !/^\d{1,3}$/.test(m[1])) return m[1].replace(/\s+/g, "").slice(0, 30); }
+  return "";
+}
+function applyDraftDoc(){
+  var said = [];
+  if(!draft.supplier.trim()){
+    var s = detectSupplier(docText, allSuppliers());
+    if(s){ draft.supplier = s.name; if(!draft.supplierEmail && s.email) draft.supplierEmail = s.email; said.push("supplier " + s.name); }
+    else { var g = guessSupplierName(docText); if(g){ draft.supplier = g; said.push("supplier " + g + " (new — check the name)"); } }
+  }
+  if(!draft.supplierEmail){ var e = guessEmail(docText); if(e){ draft.supplierEmail = e; } }
+  if(!draft.ref){ var r = detectRef(docText, "quote"); if(r){ draft.ref = r; said.push("no. " + r); } }
+  return said;
 }
 // Quotation / order lines → draft lines matched to stock
 function addDraftLines(raw, source){
@@ -728,7 +789,8 @@ function viewList(){
   var late = all.filter(isLate).sort(function(a,b){ return String(a.orderedDate).localeCompare(String(b.orderedDate)); });
   var h = '<div class="seg" style="margin-bottom:12px">' + [""].concat(locs).map(function(l){
       var n = every.filter(function(o){ return isOpen(o) && (l ? o.location === l : true); }).length, late = every.filter(function(o){ return isLate(o) && (l ? o.location === l : true); }).length;
-      return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") + '</div>';
+      return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") +
+      (user.isRoot ? '<button type="button" id="addLoc" style="font-weight:500;color:var(--muted)">＋ Add location</button>' : '') + '</div>';
   h += '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
   if(late.length){
     var dow = new Date().getDay();
@@ -753,10 +815,37 @@ function viewList(){
   return h;
 }
 
+function supIn(tt, name){
+  var sl = (tt === "board" ? (D.board && D.board.suppliers) : D.cons.suppliers) || {};
+  return Object.keys(sl).find(function(k){ return sl[k] && String(sl[k].name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase(); }) || null;
+}
+function isNewSupplier(name){ return !!String(name || "").trim() && !supIn("board", name) && !supIn("consumables", name); }
+function newSupplierHtml(d){
+  if(!isNewSupplier(d.supplier)) return "";
+  var opts = [["board","Board Stock"],["consumables","Consumables"],["both","Both"],["none","Don't add"]];
+  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--amber);border-radius:8px;background:var(--amber-dim)"><div class="small"><b>' + esc(d.supplier) + '</b> is a new supplier. Which app should it be added to?</div>' +
+    '<div class="seg" style="margin-top:8px">' + opts.map(function(o){ return '<button type="button" data-supto="' + o[0] + '" class="' + (d.newSupTo===o[0]?"on":"") + '">' + o[1] + '</button>'; }).join("") + '</div></div>';
+}
 function supplierField(val, email){
   var sups = allSuppliers();
   return '<div><label>Supplier</label><input id="dSup" list="supList" value="' + esc(val) + '" placeholder="Start typing…"><datalist id="supList">' + sups.map(function(s){ return '<option value="' + esc(s.name) + '">'; }).join("") + '</datalist></div>' +
          '<div><label>Supplier email (for follow-ups)</label><input id="dEmail" type="email" value="' + esc(email) + '" placeholder="sales@supplier.co.za"></div>';
+}
+// Root can add a location here; it's added to Board Stock and Consumables too.
+async function addLocationFlow(){
+  if(!user || !user.isRoot){ toast("Only root users can add locations.", "err"); return ""; }
+  var name = (prompt("New location name (it's added to Board Stock and Consumables too):") || "").trim();
+  if(!name) return "";
+  if(locationsAll().some(function(l){ return l.toLowerCase() === name.toLowerCase(); })){ toast(name + " already exists.", "err"); return name; }
+  if(!freshUser()) return "";
+  var add = function(fallback){ return function(cur){ var a = Array.isArray(cur) && cur.length ? cur.slice() : fallback.slice(); if(!a.some(function(l){ return String(l).toLowerCase() === name.toLowerCase(); })) a.push(name); return a; }; };
+  try{
+    await db.ref("boardStock/locations").transaction(add((D.board && D.board.locations) || ["Main"]));
+    await db.ref("consumablesStock/meta/locations").transaction(add((D.cons.meta && D.cons.meta.locations) || ["Main"]));
+    D.board = D.board || {}; D.board.locations = ((D.board.locations || []).indexOf(name) < 0) ? (D.board.locations || []).concat([name]) : D.board.locations;
+    toast(name + " added to Orders, Board Stock and Consumables.", "ok");
+    return name;
+  }catch(e){ toast("Couldn't add the location: " + (e.message || e), "err"); return ""; }
 }
 function locationsAll(){
   var a = (D.board && D.board.locations) || [], b = (D.cons.meta && D.cons.meta.locations) || [];
@@ -790,8 +879,8 @@ function viewEdit(){
        '<div><label>' + (d.status === "quote" ? "Quote no." : "Order / quote no.") + '</label><input id="dRef" value="' + esc(d.ref) + '" placeholder="e.g. PO 1045 or QTE 2231"></div>' +
        (d.status === "quote" ? '<div><label>Quote date</label><input id="dQDate" type="date" value="' + esc(d.quoteDate || today()) + '"></div>'
                              : '<div><label>Date ordered</label><input id="dODate" type="date" value="' + esc(d.orderedDate || today()) + '"></div>') +
-       '<div><label>Deliver to</label><select id="dLoc">' + locs.map(function(l){ return '<option' + (l===d.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>' +
-       '<div><label>Notes (optional)</label><input id="dNotes" value="' + esc(d.notes) + '" placeholder="e.g. for NH Hotel job"></div></div></div>';
+       '<div><label>Deliver to</label><select id="dLoc">' + locs.map(function(l){ return '<option' + (l===d.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + (user.isRoot ? '<option value="__add">＋ New location…</option>' : '') + '</select></div>' +
+       '<div><label>Notes (optional)</label><input id="dNotes" value="' + esc(d.notes) + '" placeholder="e.g. for NH Hotel job"></div></div>' + newSupplierHtml(d) + '</div>';
   h += '<div class="card"><h2><span class="step">2</span>What was ordered</h2>' +
        '<div class="drop" id="drop"><div><b>Upload the quotation</b> (or your order)</div><div class="small muted">PDF, photo, Excel or CSV — the lines are read for you</div>' +
        '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
@@ -904,6 +993,25 @@ function rcvScore(src, line){
   var nums = !a.n.length && !b.n.length ? 1 : (!a.n.length || !b.n.length) ? 0.5 : a.n.filter(function(x){ return b.n.indexOf(x) >= 0; }).length / Math.max(a.n.length, b.n.length);
   return words * 0.6 + nums * 0.4;
 }
+// Work out whose delivery note it is, then match its lines to that supplier's open orders.
+function rcvDoc(raw){
+  if(!rcv.docRef){ var ref = detectRef(docText, "delivery"); if(ref) rcv.docRef = ref; }
+  var open = ordersArr().filter(function(o){ return isOpen(o) && orderOut(o) > 0 && (!rcv.orderId || o.id === rcv.orderId); });
+  var cands = []; open.forEach(function(o){ if(!cands.some(function(c){ return c.name === o.supplier; })) cands.push({ name:o.supplier, email:o.supplierEmail || "" }); });
+  var s = detectSupplier(docText, cands);
+  if(!rcv.supplier){
+    if(!s){ rcv.pending = raw; toast("Couldn't tell which supplier this is from — pick the supplier above.", "err"); return; }
+    rcv.supplier = s.name;
+    var here = open.filter(function(o){ return o.supplier === s.name && atLoc(o, rcv.location); });
+    if(!here.length){
+      var locs = Array.from(new Set(open.filter(function(o){ return o.supplier === s.name && o.location; }).map(function(o){ return o.location; })));
+      if(locs.length === 1){ rcv.location = locs[0]; toast(s.name + "'s open orders are for " + locs[0] + " — switched to that location.", "ok"); }
+    }
+  } else if(s && s.name !== rcv.supplier){
+    toast("Careful: this looks like a " + s.name + " document, not " + rcv.supplier + ".", "err");
+  }
+  addRcvLines(raw, "delivery note");
+}
 function fillAllOutstanding(){
   rcv.lines = openLinesFor(rcv.supplier, rcv.orderId).map(function(c){ return { key:++seq, src:{ text:"" }, qty:outstanding(c.line), match:c.id, how:"picked", score:1 }; });
 }
@@ -918,14 +1026,16 @@ function viewReceive(){
        '<div><label>Delivery note no. (optional)</label><input id="rRef" value="' + esc(r.docRef) + '" placeholder="e.g. DN 55120"></div>' +
        (r.orderId ? '<div><label>Order</label><div class="small" style="padding-top:8px">' + esc(D.orders[r.orderId] ? (D.orders[r.orderId].ref || "this order") : "") + ' <button class="backlink" id="allOrders" style="margin:0 0 0 8px">use all open orders</button></div></div>' : '') +
        '</div>' + (!sups.length ? '<p class="small muted">There are no open orders waiting for deliveries at ' + esc(r.location) + '. For stock that wasn\'t ordered, use Stock In.</p>' : '') + '</div>';
-  if(r.supplier){
+  if(sups.length){
     h += '<div class="card"><h2><span class="step">2</span>Scan the delivery note</h2>' +
-       '<div class="drop" id="drop"><div><b>Drop or photograph the delivery note</b></div><div class="small muted">PDF, photo, Excel or CSV</div>' +
+       '<div class="drop" id="drop"><div><b>Drop or photograph the delivery note</b></div><div class="small muted">PDF, photo, Excel or CSV' + (r.supplier ? '' : ' — the supplier is read off the note') + '</div>' +
        '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
        '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
        '<div class="status" id="status">' + esc(statusMsg) + '</div><div class="bar' + (busy?"":" hide") + '"><i id="barI" style="width:' + Math.round(progress*100) + '%"></i></div>' +
        (r.file ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(r.file.name) + '</div>' : '') +
-       '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="allCame">✓ Everything outstanding arrived</button><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line</button></div></div>';
+       (r.supplier ? '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="allCame">✓ Everything outstanding arrived</button><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line</button></div>' : '') + '</div>';
+  }
+  if(r.supplier){
     h += '<div class="card"><h2><span class="step">3</span>Check what arrived</h2>';
     if(!r.lines.length) h += '<div class="empty">' + cands.length + ' line' + (cands.length===1?"":"s") + ' still to come from ' + esc(r.supplier) + '. Scan the delivery note, or tap “Everything outstanding arrived”.</div>';
     else {
@@ -967,6 +1077,7 @@ async function saveDraft(){
     if(l.stock === "new:cons" && !(l.nf && l.nf.name)) { toast("Give the new consumable a name.", "err"); return; }
     if(!l.text && !l.desc && !l.stock){ toast("A hand-typed line needs a description or a stock item.", "err"); return; }
   }
+  if(isNewSupplier(d.supplier) && !d.newSupTo){ toast(d.supplier + " is a new supplier — choose which app to add it to (top of the page).", "err"); window.scrollTo(0, 0); return; }
   var unlinked = lines.filter(function(l){ return !l.stock; }).length;
   if(unlinked && !confirm(unlinked + " line" + (unlinked===1?" isn't":"s aren't") + " linked to a board or consumable yet, so " + (unlinked===1?"it":"they") + " won't go into stock when delivered. Save anyway? (You can link them later with Edit.)")) return;
   if(!freshUser()) return;
@@ -994,7 +1105,14 @@ async function saveDraft(){
     lines.forEach(function(l){ if(!l.stock || l.stock === "none" || l.stock.indexOf("new:") === 0 || !l.text) return; var t = targetOf(l.stock), k = L.aliasKey(l);
       if(k) upd[t][fbKey(k)] = { itemId:l.stock.replace(/^[bc]:/, ""), text:String(l.text).slice(0,160) }; });
     for(var t in upd) if(Object.keys(upd[t]).length) await db.ref("stockIn/aliases/" + t).update(upd[t]);
-    toast((d.status === "quote" ? "Quote" : "Order") + " saved.", "ok");
+    // a supplier new to Board Stock / Consumables is added to that app's supplier list
+    var added = [], newTo = isNewSupplier(d.supplier) ? d.newSupTo : "";
+    for(var tt of ["board", "consumables"]){
+      var path = tt === "board" ? "boardStock/suppliers" : "consumablesStock/suppliers", hit = supIn(tt, d.supplier);
+      if(!hit && (newTo === tt || newTo === "both")){ await db.ref(path + "/sup" + uid()).set({ name:d.supplier, email:d.supplierEmail || "", addedFrom:"Orders" }); added.push(tt === "board" ? "Board Stock" : "Consumables"); }
+      else if(hit && d.supplierEmail){ var sl = (tt === "board" ? D.board.suppliers : D.cons.suppliers) || {}; if(!sl[hit].email) await db.ref(path + "/" + hit + "/email").set(d.supplierEmail); }
+    }
+    toast((d.status === "quote" ? "Quote" : "Order") + " saved." + (added.length ? " " + d.supplier + " added to " + added.join(" and ") + " suppliers." : ""), "ok");
     draft = null; ui.view = "order"; ui.orderId = id;
   }catch(e){ console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
   busy = false; render();
@@ -1155,6 +1273,7 @@ function bind(){
   // list
   if(q("#newOrder")) q("#newOrder").onclick = function(){ editOrder(null); };
   if(q("#rcvAny")) q("#rcvAny").onclick = function(){ startReceive("", null); };
+  if(q("#addLoc")) q("#addLoc").onclick = async function(){ var n = await addLocationFlow(); if(n){ setLoc(n); render(); } };
   qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
   qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
   if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
@@ -1174,9 +1293,14 @@ function bind(){
   // edit
   if(ui.view === "edit" && draft){
     ["dSup","dEmail","dRef","dQDate","dODate","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
-    if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; q("#dEmail").value = s.email; } };
+    if(q("#dLoc")) q("#dLoc").onchange = async function(){
+      if(this.value !== "__add"){ readDraftFields(); return; }
+      var keep = draft.location; readDraftFields(); draft.location = keep;
+      var n = await addLocationFlow(); if(n) draft.location = n; render(); };
+    if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; } render(); };
+    qa("[data-supto]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.newSupTo = b.getAttribute("data-supto"); render(); }; });
     qa("[data-st]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.status = b.getAttribute("data-st"); render(); }; });
-    bindFileInputs(function(f){ readDraftFields(); draft.file = f; readInto(f, function(raw){ addDraftLines(raw, "file"); }); });
+    bindFileInputs(function(f){ readDraftFields(); draft.file = f; readInto(f, function(raw){ var said = applyDraftDoc(); addDraftLines(raw, "file"); if(said.length) setTimeout(function(){ toast("Read " + said.join(" and ") + " from the document.", "ok"); }, 1800); }); });
     if(q("#pasteGo")) q("#pasteGo").onclick = function(){ readDraftFields(); addDraftLines(L.linesFromText(q("#pasteIn").value), "pasted text"); render(); };
     if(q("#addBlank")) q("#addBlank").onclick = function(){ readDraftFields(); draft.lines.push({ key:++seq, text:"", code:"", desc:"", size:"", qty:0, received:0, stock:"", how:"picked", score:1 }); render(); };
     qa("[data-stock]").forEach(function(s){ s.onchange = function(){ readDraftFields(); var l = draftLine(s.getAttribute("data-stock")); l.stock = s.value; l.how = "picked"; l.score = 1;
@@ -1193,13 +1317,15 @@ function bind(){
   }
   // receive
   if(ui.view === "receive" && rcv){
-    if(q("#rSup")) q("#rSup").onchange = function(){ if(rcv.lines.length && !confirm("Changing supplier clears the lines below. Carry on?")){ this.value = rcv.supplier; return; } rcv.supplier = this.value; rcv.orderId = null; rcv.lines = []; render(); };
+    if(q("#rSup")) q("#rSup").onchange = function(){ if(rcv.lines.length && !confirm("Changing supplier clears the lines below. Carry on?")){ this.value = rcv.supplier; return; } rcv.supplier = this.value; rcv.orderId = null; rcv.lines = [];
+      if(rcv.supplier && rcv.pending){ var p = rcv.pending; rcv.pending = null; addRcvLines(p, "delivery note"); }
+      render(); };
     if(q("#rLoc")) q("#rLoc").onchange = function(){
       if(rcv.lines.length && !rcv.orderId && !confirm("Changing location clears the lines below. Carry on?")){ this.value = rcv.location; return; }
       rcv.location = this.value; if(!rcv.orderId){ rcv.lines = []; if(!openLinesFor(rcv.supplier).length) rcv.supplier = ""; } render(); };
     if(q("#rRef")) q("#rRef").oninput = function(){ rcv.docRef = this.value.trim(); };
     if(q("#allOrders")) q("#allOrders").onclick = function(){ rcv.orderId = null; render(); };
-    bindFileInputs(function(f){ rcv.file = f; readInto(f, function(raw){ addRcvLines(raw, "delivery note"); }); });
+    bindFileInputs(function(f){ rcv.file = f; readInto(f, function(raw){ rcvDoc(raw); }); });
     if(q("#allCame")) q("#allCame").onclick = function(){ if(rcv.lines.length && !confirm("Replace the lines below with everything still to come?")) return; fillAllOutstanding(); render(); };
     if(q("#addBlank")) q("#addBlank").onclick = function(){ rcv.lines.push({ key:++seq, src:{ text:"" }, qty:0, match:"", how:"picked", score:1 }); render(); };
     qa("[data-rmatch]").forEach(function(s){ s.onchange = function(){ var l = rcvLine(s.getAttribute("data-rmatch")); l.match = s.value; l.how = "picked"; l.skip = !s.value;
