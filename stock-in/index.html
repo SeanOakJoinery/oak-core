@@ -256,7 +256,30 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
   // header row ("Code  Description  Qty ...") up to the totals/footer.
   var HEADROW = /\b(qty|quantity|qnty|units?)\b/i, HEADDESC = /\b(description|desc|item|product|details)\b/i;
   var FOOT = /\b(total item|net value|sub ?total|total excl|total incl|total vat|vat total|amount due|balance due|terms and conditions|terms of|banking details|deliver to|delivery address|received by|thank you)\b/i;
+  // Cut-to-size quotes (glass, mirrors, panels): the item on one line and
+  // "5 x  598.0 *  2198.0  m2 ..." (qty x width * height) on the next.
+  var DIMS = /^\s*(\d{1,4})\s*[x\u00d7X]\s+(\d{2,5}(?:[.,]\d+)?)\s*[*x\u00d7X]\s*(\d{2,5}(?:[.,]\d+)?)(?!\d)/;
+  function mm(v) { var n = parseFloat(String(v).replace(",", ".")); return String(Math.round(n * 10) / 10).replace(/\.0$/, ""); }
+  function cutSizeLines(text) {
+    var rows = String(text || "").split(/\r?\n/), out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var d = rows[i].match(DIMS);
+      if (!d) continue;
+      var head = rows[i - 1].trim();
+      if (!/[a-z]/i.test(head) || DIMS.test(head) || STOP.test(head)) continue;
+      var m = head.match(/^\s*(?:\d{1,3}\s*[).:-]\s*)?([A-Z]{0,4}\d{3,}[\w\-\/]*)?\s*(.*)$/i);
+      var code = (m && m[1]) || "", desc = ((m && m[2]) || head).replace(/\s{2,}/g, " ").trim();
+      var note = "", nx = rows[i + 1] || "";
+      if (nx.trim() && /[a-z]{3,}/i.test(nx) && !DIMS.test(nx) && !(rows[i + 2] || "").match(DIMS) && !STOP.test(nx) && !/^[.\-_\s]+$/.test(nx)) note = nx.replace(/\s{2,}/g, " ").trim();
+      out.push({ code: code, desc: desc, size: mm(d[2]) + " x " + mm(d[3]), job: "", material: "", notes: note, qty: parseInt(d[1], 10), qtyL: null,
+        text: [head, rows[i].trim(), note].filter(Boolean).join("  ").replace(/\s{2,}/g, "  ") });
+    }
+    return out;
+  }
+
   function linesFromDoc(text) {
+    var cut = cutSizeLines(text);
+    if (cut.length) return cut;
     var rows = String(text || "").split(/\r?\n/);
     var out = [], inTable = false, found = false;
     rows.forEach(function (r) {
@@ -425,7 +448,7 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
   }
 
   var api = { norm: norm, tokens: tokens, toQty: toQty, linesFromTable: linesFromTable, parseTextLine: parseTextLine,
-    linesFromText: linesFromText, linesFromDoc: linesFromDoc, pdfTable: pdfTable, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, codeKey: codeKey, score: score };
+    linesFromText: linesFromText, linesFromDoc: linesFromDoc, cutSizeLines: cutSizeLines, pdfTable: pdfTable, pdfItemsToText: pdfItemsToText, matchLine: matchLine, aliasKey: aliasKey, codeKey: codeKey, score: score };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else global.StockInLib = api;
 })(typeof window !== "undefined" ? window : this);
