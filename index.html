@@ -97,7 +97,10 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
       icon:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' },
     { id:"stockIn",     name:"Stock In",    desc:"Delivery notes, invoices, Excel", url:"/oak-core/stock-in/",
       icon:'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
-      visible: function(u){ return stockInAllowed(u); } }
+      visible: function(u){ return stockInAllowed(u); } },
+    { id:"orders",      name:"Orders",      desc:"Supplier orders & deliveries", url:"/oak-core/orders/",
+      icon:'<path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h3"/>',
+      visible: function(u){ return ordersAllowed(u); } }
   ];
   function hasPerm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
   // Stock In shows for anyone who may add stock to at least one app.
@@ -105,6 +108,12 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
     return (core.userHasApp(u, "boardStock") && hasPerm(u, "boardAddQty")) ||
            (core.userHasApp(u, "consumables") && (hasPerm(u, "consManageItems") || hasPerm(u, "consManageConsumables"))) ||
            (core.userHasApp(u, "stock") && hasPerm(u, "stockAddQty"));
+  }
+
+  // Orders shows for anyone who may add stock to Board Stock or Consumables.
+  function ordersAllowed(u){
+    return (core.userHasApp(u, "boardStock") && hasPerm(u, "boardAddQty")) ||
+           (core.userHasApp(u, "consumables") && (hasPerm(u, "consManageItems") || hasPerm(u, "consManageConsumables")));
   }
 
   var LAST_KEY = "oakHomeLastUser";
@@ -224,8 +233,8 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
         h += '<div class="card none"><p>You don\'t have any apps yet.</p><p class="muted small">Ask Sean to tick the apps you need in your user settings.</p></div>';
       } else {
         h += '<div class="tiles">';
-        apps.forEach(function(a){
-          h += '<a class="tile' + (a.id === 'stockIn' ? ' wide' : '') + '" href="' + a.url + '"><div class="ic"><svg viewBox="0 0 24 24">' + a.icon + '</svg></div>' +
+        apps.forEach(function(a, i){
+          h += '<a class="tile' + (i === apps.length - 1 && apps.length % 2 === 1 ? ' wide' : '') + '" href="' + a.url + '"><div class="ic"><svg viewBox="0 0 24 24">' + a.icon + '</svg></div>' +
                '<div><div class="n">' + esc(a.name) + '</div><div class="d">' + esc(a.desc) + '</div></div></a>';
         });
         h += '</div>';
