@@ -131,7 +131,7 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 
   var view = "boot", pickId = null, err = "", busy = false, user = null;
-  var fails = 0, lockedUntil = 0;
+  var fails = 0, lockedUntil = 0; var autoSeq = 0;
 
   function findUser(id){ return core.getUsers().find(function(u){ return u && u.id === id; }) || null; }
   function canUse(u, a){ return a.visible ? a.visible(u) : core.userHasApp(u, a.id); }
@@ -218,6 +218,14 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
         '<button class="btn btn-primary" id="go" type="button"' + (busy?" disabled":"") + '>' + (busy?"Checking…":"Log in") + '</button></div></div>';
       var p = document.getElementById("pin"); p.value = prev; if(!busy) p.focus();
       p.addEventListener("keydown", function(e){ if(e.key === "Enter") doLogin(); });
+      // Signs in as soon as the right PIN is typed — no need to press Log in.
+      // A wrong PIN only counts as a failed try when Log in / Enter is pressed.
+      p.addEventListener("input", function(){
+        var val = p.value, mine = ++autoSeq;
+        if(val.length < 4 || busy || Date.now() < lockedUntil) return;
+        var cu = findUser(pickId);
+        core.verifyPin(cu, val).then(function(ok){ if(ok && mine === autoSeq && p.value === val && !busy) doLogin(); });
+      });
       document.getElementById("go").addEventListener("click", doLogin);
       document.getElementById("back").addEventListener("click", function(){ view = "pick"; err = ""; render(); });
       return;
