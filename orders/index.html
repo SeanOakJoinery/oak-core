@@ -478,7 +478,10 @@ function allowed(u){ return canBoard(u) || canCons(u); }
 // ---------- state ----------
 var user = null;
 var D = { board:null, cons:{ items:{}, types:{}, suppliers:{}, meta:{} }, orders:{}, aliases:{}, loaded:false };
-var ui = { view:"list", filter:"open", search:"", orderId:null };
+var ui = { view:"list", filter:"open", search:"", orderId:null, loc:(function(){ try{ return localStorage.getItem("oakOrdersLoc") || ""; }catch(e){ return ""; } })() };
+function setLoc(l){ ui.loc = l; try{ localStorage.setItem("oakOrdersLoc", l); }catch(e){} }
+// An order belongs to its delivery location; old orders without one show everywhere.
+function atLoc(o, loc){ return !loc || !o.location || o.location === loc; }
 var draft = null;   // new / edit order
 var rcv = null;     // receiving a delivery
 var busy = false, statusMsg = "", progress = 0, seq = 0;
@@ -711,17 +714,22 @@ function orderCard(o){
   var pct = qty ? Math.round((qty - out) / qty * 100) : 0;
   var cls = isLate(o) ? "late" : o.status === "part" ? "part" : (o.status === "received" || o.status === "closed") ? "done" : o.status === "quote" ? "quote" : "";
   return '<div class="ord ' + cls + '" data-open="' + esc(o.id) + '"><div class="h"><b>' + esc(o.supplier || "—") + '</b>' + statusPill(o) + '</div>' +
-    '<div class="small muted">' + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
+    '<div class="small muted">' + (!ui.loc && o.location ? "📍 " + esc(o.location) + " · " : "") + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
     (o.status === "quote" ? " · quote from " + fmtDate(o.quoteDate || (o.created||"").slice(0,10)) : " · ordered " + fmtDate(o.orderedDate)) +
     (isOpen(o) && out > 0 ? " · <b style='color:var(--amber)'>" + lines.filter(function(l){ return outstanding(l) > 0; }).length + " line(s) still to come</b>" : "") + '</div>' +
     (o.status !== "quote" ? '<div class="prog"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
 }
 function viewList(){
   footer(null);
-  var all = ordersArr(), q = ui.search.trim().toLowerCase();
+  var locs = locationsAll();
+  if(ui.loc && locs.indexOf(ui.loc) < 0) setLoc("");
+  var every = ordersArr(), all = every.filter(function(o){ return atLoc(o, ui.loc); }), q = ui.search.trim().toLowerCase();
   var match = function(o){ return !q || [o.supplier, o.ref, o.notes].concat(orderLines(o).map(function(l){ return l.text + " " + stockLabel(l); })).join(" ").toLowerCase().indexOf(q) >= 0; };
   var late = all.filter(isLate).sort(function(a,b){ return String(a.orderedDate).localeCompare(String(b.orderedDate)); });
-  var h = '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
+  var h = '<div class="seg" style="margin-bottom:12px">' + [""].concat(locs).map(function(l){
+      var n = every.filter(function(o){ return isOpen(o) && (l ? o.location === l : true); }).length, late = every.filter(function(o){ return isLate(o) && (l ? o.location === l : true); }).length;
+      return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") + '</div>';
+  h += '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
   if(late.length){
     var dow = new Date().getDay();
     h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — " : dow === 3 ? "Wednesday check — " : "") + 'still outstanding after a week</h2><p class="small muted" style="margin-top:0">Ordered ' + LATE_DAYS + '+ days ago and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
@@ -735,7 +743,12 @@ function viewList(){
     if(ui.filter === "done") return o.status === "received" || o.status === "closed";
     return true;
   }).filter(match).sort(function(a,b){ return String(b.orderedDate || b.created || "").localeCompare(String(a.orderedDate || a.created || "")); });
-  h += shown.length ? '<div class="olist">' + shown.map(orderCard).join("") + '</div>' : '<div class="empty">' + (all.length ? "Nothing here." : "No orders yet. Tap “New order / quote” and upload a quotation, or type the lines.") + '</div>';
+  if(!shown.length) h += '<div class="empty">' + (all.length ? "Nothing here." : "No orders" + (ui.loc ? " for " + esc(ui.loc) : "") + " yet. Tap “New order / quote” and upload a quotation, or type the lines.") + '</div>';
+  else if(ui.loc) h += '<div class="olist">' + shown.map(orderCard).join("") + '</div>';
+  else locs.concat([""]).forEach(function(l){
+    var part = shown.filter(function(o){ return l ? o.location === l : locs.indexOf(o.location) < 0; });
+    if(part.length) h += '<h2 style="margin:14px 0 8px;font-size:15px">📍 ' + (l ? esc(l) : "No location set") + ' <span class="muted small">(' + part.length + ')</span></h2><div class="olist">' + part.map(orderCard).join("") + '</div>';
+  });
   h += '</div>';
   return h;
 }
@@ -838,8 +851,8 @@ function viewOrder(o){
 
 // ---------- receiving ----------
 function openLinesFor(supplier, onlyId){
-  var key = String(supplier||"").trim().toLowerCase(), out = [];
-  ordersArr().filter(function(o){ return isOpen(o) && (onlyId ? o.id === onlyId : String(o.supplier||"").trim().toLowerCase() === key); })
+  var key = String(supplier||"").trim().toLowerCase(), out = [], loc = rcv ? rcv.location : "";
+  ordersArr().filter(function(o){ return isOpen(o) && (onlyId ? o.id === onlyId : (String(o.supplier||"").trim().toLowerCase() === key && atLoc(o, loc))); })
     .sort(function(a,b){ return String(a.orderedDate).localeCompare(String(b.orderedDate)); })
     .forEach(function(o){ orderLines(o).forEach(function(l){ if(outstanding(l) > 0) out.push({ id:o.id + "|" + l.lid, oid:o.id, lid:l.lid, order:o, line:l,
       label:(l.desc || l.text || stockLabel(l)).slice(0, 70) + " — " + outstanding(l) + " " + unitOf(l) + " to come" + (o.ref ? " (" + o.ref + ")" : ""),
@@ -848,7 +861,7 @@ function openLinesFor(supplier, onlyId){
 }
 function startReceive(supplier, orderId){
   var o = orderId ? D.orders[orderId] : null;
-  rcv = { supplier: o ? o.supplier : (supplier || ""), orderId: orderId || null, location: (o && o.location) || locationsAll()[0], docRef:"", file:null, lines:[] };
+  rcv = { supplier: o ? o.supplier : (supplier || ""), orderId: orderId || null, location: (o && o.location) || ui.loc || locationsAll()[0], docRef:"", file:null, lines:[] };
   ui.view = "receive"; render(); window.scrollTo(0, 0);
 }
 function addRcvLines(raw, source){
@@ -895,15 +908,16 @@ function fillAllOutstanding(){
   rcv.lines = openLinesFor(rcv.supplier, rcv.orderId).map(function(c){ return { key:++seq, src:{ text:"" }, qty:outstanding(c.line), match:c.id, how:"picked", score:1 }; });
 }
 function viewReceive(){
-  var r = rcv, sups = Array.from(new Set(ordersArr().filter(isOpen).filter(function(o){ return orderOut(o) > 0; }).map(function(o){ return o.supplier; }))).sort();
+  var r = rcv, sups = Array.from(new Set(ordersArr().filter(isOpen).filter(function(o){ return orderOut(o) > 0 && (r.orderId ? o.id === r.orderId : atLoc(o, r.location)); }).map(function(o){ return o.supplier; }))).sort();
+  if(r.supplier && sups.indexOf(r.supplier) < 0) sups.unshift(r.supplier);
   var cands = r.supplier ? openLinesFor(r.supplier, r.orderId) : [];
   var h = '<button class="backlink" id="back">← Back</button>';
   h += '<div class="card"><h2><span class="step">1</span>Receive a delivery</h2><div class="grid2">' +
        '<div><label>Supplier</label><select id="rSup"><option value="">— pick —</option>' + sups.map(function(s){ return '<option' + (s===r.supplier?" selected":"") + '>' + esc(s) + '</option>'; }).join("") + '</select></div>' +
-       '<div><label>Delivered to</label><select id="rLoc">' + locationsAll().map(function(l){ return '<option' + (l===r.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>' +
+       '<div><label>Delivered to (shows the orders for this location)</label><select id="rLoc">' + locationsAll().map(function(l){ return '<option' + (l===r.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + '</select></div>' +
        '<div><label>Delivery note no. (optional)</label><input id="rRef" value="' + esc(r.docRef) + '" placeholder="e.g. DN 55120"></div>' +
        (r.orderId ? '<div><label>Order</label><div class="small" style="padding-top:8px">' + esc(D.orders[r.orderId] ? (D.orders[r.orderId].ref || "this order") : "") + ' <button class="backlink" id="allOrders" style="margin:0 0 0 8px">use all open orders</button></div></div>' : '') +
-       '</div>' + (!sups.length ? '<p class="small muted">There are no open orders waiting for deliveries. For stock that wasn\'t ordered, use Stock In.</p>' : '') + '</div>';
+       '</div>' + (!sups.length ? '<p class="small muted">There are no open orders waiting for deliveries at ' + esc(r.location) + '. For stock that wasn\'t ordered, use Stock In.</p>' : '') + '</div>';
   if(r.supplier){
     h += '<div class="card"><h2><span class="step">2</span>Scan the delivery note</h2>' +
        '<div class="drop" id="drop"><div><b>Drop or photograph the delivery note</b></div><div class="small muted">PDF, photo, Excel or CSV</div>' +
@@ -1101,7 +1115,7 @@ function editOrder(o){
   draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
     location:o.location || locationsAll()[0], notes:o.notes||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
     lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), stock:l.stock||"", nf:l.nf||null, per:l.per||"", how:"picked", score:1 }; }) }
-    : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:locationsAll()[0], notes:"", file:null, lines:[] };
+    : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:ui.loc || locationsAll()[0], notes:"", file:null, lines:[] };
   ui.view = "edit"; render(); window.scrollTo(0, 0);
 }
 function readDraftFields(){
@@ -1141,6 +1155,7 @@ function bind(){
   // list
   if(q("#newOrder")) q("#newOrder").onclick = function(){ editOrder(null); };
   if(q("#rcvAny")) q("#rcvAny").onclick = function(){ startReceive("", null); };
+  qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
   qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
   if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
   qa("[data-open]").forEach(function(c){ c.onclick = function(){ ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
@@ -1179,7 +1194,9 @@ function bind(){
   // receive
   if(ui.view === "receive" && rcv){
     if(q("#rSup")) q("#rSup").onchange = function(){ if(rcv.lines.length && !confirm("Changing supplier clears the lines below. Carry on?")){ this.value = rcv.supplier; return; } rcv.supplier = this.value; rcv.orderId = null; rcv.lines = []; render(); };
-    if(q("#rLoc")) q("#rLoc").onchange = function(){ rcv.location = this.value; render(); };
+    if(q("#rLoc")) q("#rLoc").onchange = function(){
+      if(rcv.lines.length && !rcv.orderId && !confirm("Changing location clears the lines below. Carry on?")){ this.value = rcv.location; return; }
+      rcv.location = this.value; if(!rcv.orderId){ rcv.lines = []; if(!openLinesFor(rcv.supplier).length) rcv.supplier = ""; } render(); };
     if(q("#rRef")) q("#rRef").oninput = function(){ rcv.docRef = this.value.trim(); };
     if(q("#allOrders")) q("#allOrders").onclick = function(){ rcv.orderId = null; render(); };
     bindFileInputs(function(f){ rcv.file = f; readInto(f, function(raw){ addRcvLines(raw, "delivery note"); }); });
