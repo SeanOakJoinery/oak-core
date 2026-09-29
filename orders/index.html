@@ -601,9 +601,11 @@ function outstanding(l){ return Math.max(0, r2(num(l.qty) - num(l.received))); }
 function orderOut(o){ return orderLines(o).reduce(function(a,l){ return a + outstanding(l); }, 0); }
 function orderQty(o){ return orderLines(o).reduce(function(a,l){ return a + num(l.qty); }, 0); }
 function isOpen(o){ return o.status === "ordered" || o.status === "part"; }
-function isLate(o){ return isOpen(o) && orderOut(o) > 0 && daysSince(o.orderedDate) >= LATE_DAYS; }
+// Late = past the delivery date the supplier gave (if one was entered), otherwise a week after ordering.
+function isLate(o){ return isOpen(o) && orderOut(o) > 0 && (o.dueDate ? today() > o.dueDate : daysSince(o.orderedDate) >= LATE_DAYS); }
 function statusPill(o){
-  if(isLate(o)) return '<span class="pill late">' + daysSince(o.orderedDate) + ' days — outstanding</span>';
+  if(isLate(o)) return '<span class="pill late">' + (o.dueDate ? daysSince(o.dueDate) + ' day' + (daysSince(o.dueDate)===1?'':'s') + ' late' : daysSince(o.orderedDate) + ' days — outstanding') + '</span>';
+  if(isOpen(o) && o.dueDate && orderOut(o) > 0) return '<span class="pill ordered">Due ' + fmtDate(o.dueDate).replace(/ \d{4}$/, "") + '</span>';
   var t = { quote:"Quote", ordered:"Ordered", part:"Part delivered", received:"All received", closed:"Closed" }[o.status] || o.status;
   return '<span class="pill ' + esc(o.status) + '">' + t + '</span>';
 }
@@ -800,7 +802,7 @@ function orderCard(o){
   var cls = isLate(o) ? "late" : o.status === "part" ? "part" : (o.status === "received" || o.status === "closed") ? "done" : o.status === "quote" ? "quote" : "";
   return '<div class="ord ' + cls + '" data-open="' + esc(o.id) + '"><div class="h"><b>' + esc(o.supplier || "—") + '</b>' + statusPill(o) + '</div>' +
     '<div class="small muted">' + (!ui.loc && o.location ? "📍 " + esc(o.location) + " · " : "") + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
-    (o.status === "quote" ? " · quote from " + fmtDate(o.quoteDate || (o.created||"").slice(0,10)) : " · ordered " + fmtDate(o.orderedDate)) +
+    (o.status === "quote" ? " · quote from " + fmtDate(o.quoteDate || (o.created||"").slice(0,10)) : " · ordered " + fmtDate(o.orderedDate) + (o.dueDate ? " · due " + fmtDate(o.dueDate) : "")) +
     (isOpen(o) && out > 0 ? " · <b style='color:var(--amber)'>" + lines.filter(function(l){ return outstanding(l) > 0; }).length + " line(s) still to come</b>" : "") + '</div>' +
     (o.status !== "quote" ? '<div class="prog"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
 }
@@ -818,7 +820,7 @@ function viewList(){
   h += '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
   if(late.length){
     var dow = new Date().getDay();
-    h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — " : dow === 3 ? "Wednesday check — " : "") + 'still outstanding after a week</h2><p class="small muted" style="margin-top:0">Ordered ' + LATE_DAYS + '+ days ago and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
+    h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — overdue deliveries" : dow === 3 ? "Wednesday check — overdue deliveries" : "Overdue deliveries") + '</h2><p class="small muted" style="margin-top:0">Past the delivery date the supplier gave (or ' + LATE_DAYS + '+ days since ordering if no date was given) and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
   }
   var filters = [["open","Open orders"],["quote","Quotes"],["done","Received / closed"],["all","All"]];
   h += '<div class="card"><div class="tabs">' + filters.map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
@@ -902,7 +904,8 @@ function viewEdit(){
        '<div class="grid2">' + supplierField(d.supplier, d.supplierEmail) +
        '<div><label>' + (d.status === "quote" ? "Quote no." : "Order / quote no.") + '</label><input id="dRef" value="' + esc(d.ref) + '" placeholder="e.g. PO 1045 or QTE 2231"></div>' +
        (d.status === "quote" ? '<div><label>Quote date</label><input id="dQDate" type="date" value="' + esc(d.quoteDate || today()) + '"></div>'
-                             : '<div><label>Date ordered</label><input id="dODate" type="date" value="' + esc(d.orderedDate || today()) + '"></div>') +
+                             : '<div><label>Date ordered</label><input id="dODate" type="date" value="' + esc(d.orderedDate || today()) + '"></div>' +
+                               '<div><label>Delivery date the supplier gave (optional)</label><input id="dDue" type="date" value="' + esc(d.dueDate || "") + '"></div>') +
        '<div><label>Deliver to</label><select id="dLoc">' + locs.map(function(l){ return '<option' + (l===d.location?" selected":"") + '>' + esc(l) + '</option>'; }).join("") + (user.isRoot ? '<option value="__add">＋ New location…</option>' : '') + '</select></div>' +
        '<div><label>Notes (optional)</label><input id="dNotes" value="' + esc(d.notes) + '" placeholder="e.g. for NH Hotel job"></div></div>' + newSupplierHtml(d) + '</div>';
   h += '<div class="card"><h2><span class="step">2</span>What was ordered</h2>' +
@@ -937,6 +940,7 @@ function viewOrder(o){
        '<div class="kv" style="margin-top:10px">' +
        '<div>Order / quote no.</div><div>' + esc(o.ref || "—") + '</div>' +
        (o.status === "quote" ? '<div>Quote date</div><div>' + fmtDate(o.quoteDate) + '</div>' : '<div>Ordered</div><div>' + fmtDate(o.orderedDate) + ' (' + daysSince(o.orderedDate) + ' days ago)</div>') +
+       (o.status !== "quote" ? '<div>Delivery date</div><div>' + (isOpen(o) ? '<input type="date" id="dueSet" value="' + esc(o.dueDate || "") + '" style="width:auto;padding:5px 8px"> <span class="small muted">' + (o.dueDate ? (isLate(o) ? '<span style="color:#E39A80">overdue</span>' : 'as promised by the supplier') : 'none given — overdue after ' + LATE_DAYS + ' days') + '</span>' : (o.dueDate ? fmtDate(o.dueDate) : "—")) + '</div>' : '') +
        '<div>Deliver to</div><div>' + esc(o.location || "—") + '</div>' +
        (o.supplierEmail ? '<div>Email</div><div><a style="color:var(--amber)" href="mailto:' + esc(o.supplierEmail) + '">' + esc(o.supplierEmail) + '</a></div>' : '') +
        (o.notes ? '<div>Notes</div><div>' + esc(o.notes) + '</div>' : '') +
@@ -1113,7 +1117,7 @@ async function saveDraft(){
     delete o.id;
     o.supplier = d.supplier; o.supplierEmail = d.supplierEmail || ""; o.ref = d.ref || ""; o.location = d.location; o.notes = d.notes || "";
     o.status = d.status === "quote" ? "quote" : (old && isOpen(old) ? old.status : "ordered");
-    if(d.status === "quote") o.quoteDate = d.quoteDate || today(); else o.orderedDate = d.orderedDate || today();
+    if(d.status === "quote") o.quoteDate = d.quoteDate || today(); else { o.orderedDate = d.orderedDate || today(); o.dueDate = d.dueDate || null; }
     if(quoteUrl){ o.quoteUrl = quoteUrl; o.quoteFile = d.file ? d.file.name : (d.quoteFile || ""); }
     o.lines = {};
     lines.forEach(function(l, n){
@@ -1255,7 +1259,7 @@ async function setStatus2(o, status, extra){
 // ---------- events ----------
 function editOrder(o){
   draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
-    location:o.location || locationsAll()[0], notes:o.notes||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
+    location:o.location || locationsAll()[0], notes:o.notes||"", dueDate:o.dueDate||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
     lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), stock:l.stock||"", nf:l.nf||null, per:l.per||"", how:"picked", score:1 }; }) }
     : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:ui.loc || locationsAll()[0], notes:"", file:null, lines:[] };
   ui.view = "edit"; render(); window.scrollTo(0, 0);
@@ -1268,6 +1272,7 @@ function readDraftFields(){
   if(g("dRef") !== undefined) draft.ref = g("dRef").trim();
   if(g("dQDate") !== undefined) draft.quoteDate = g("dQDate");
   if(g("dODate") !== undefined) draft.orderedDate = g("dODate");
+  if(g("dDue") !== undefined) draft.dueDate = g("dDue");
   if(g("dLoc") !== undefined) draft.location = g("dLoc");
   if(g("dNotes") !== undefined) draft.notes = g("dNotes");
 }
@@ -1308,6 +1313,7 @@ function bind(){
     o.id = ui.orderId;
     if(q("#placeOrder")) q("#placeOrder").onclick = function(){ var d = (q("#placeDate") || {}).value || today(); setStatus2(o, "ordered", { orderedDate:d }); };
     if(q("#rcvThis")) q("#rcvThis").onclick = function(){ startReceive(o.supplier, o.id); };
+    if(q("#dueSet")) q("#dueSet").onchange = function(){ setStatus2(o, o.status, { dueDate: this.value || null }); };
     if(q("#editOrder")) q("#editOrder").onclick = function(){ editOrder(o); };
     if(q("#closeOrder")) q("#closeOrder").onclick = function(){ if(confirm("Close this order? The " + orderOut(o) + " item(s) still to come are marked as not coming and it drops off the Monday/Wednesday check.")) setStatus2(o, "closed", { closedBy:user.username, closedAt:new Date().toISOString() }); };
     if(q("#reopen")) q("#reopen").onclick = function(){ setStatus2(o, list(o.deliveries).length ? "part" : "ordered"); };
@@ -1316,7 +1322,7 @@ function bind(){
   }
   // edit
   if(ui.view === "edit" && draft){
-    ["dSup","dEmail","dRef","dQDate","dODate","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
+    ["dSup","dEmail","dRef","dQDate","dODate","dDue","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
     if(q("#dLoc")) q("#dLoc").onchange = async function(){
       if(this.value !== "__add"){ readDraftFields(); return; }
       var keep = draft.location; readDraftFields(); draft.location = keep;
