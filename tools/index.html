@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery Tools — sign tools out and back in, with a check on return.">
+<title>Tools</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="../manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{--bg:#1E1C18;--panel:#26221C;--panel-2:#2E2A22;--text:#EFE8D8;--muted:#9C9280;--amber:#E3A23A;--amber-dim:#3B2E1A;--line:#433D32;--green:#5FA76E;--green-dim:#1F3325;--rust:#C46A4A;--rust-dim:#3A231B;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;--font-m:"Space Grotesk","Inter",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.wrap{max-width:760px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px}
+.brand .s{font-size:12px;color:var(--muted)}
+h2{font-family:var(--font-m);font-weight:600;font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber-dim);color:var(--amber);font-size:12px;font-weight:600;margin-right:8px;vertical-align:1px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px 10px;font:inherit;font-weight:600;cursor:pointer}
+.seg button.on{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font:inherit;font-size:15px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);text-decoration:none}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn-sm{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amber);background:var(--amber-dim)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--amber);border-color:var(--amber)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+.bar{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .2s}
+.lines{display:grid;gap:10px}
+.line{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.line.ok{border-left-color:var(--green)}
+.line.check{border-left-color:var(--amber)}
+.line.new{border-left-color:#6FA0C8}
+.line.skip{opacity:.55}
+.line .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-word;margin-bottom:6px}
+.line .lrow{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:center}
+.line .unit{font-size:12px;color:var(--muted)}
+.line .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.line .newf{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.line .newf label{margin:0 0 3px}
+.tag{font-size:11px;border-radius:99px;padding:2px 8px;margin-left:6px}
+.tag.ok{background:var(--green-dim);color:var(--green)}.tag.check{background:var(--amber-dim);color:var(--amber)}.tag.new{background:#1C2A36;color:#8FB9DB}
+.sum{position:fixed;left:0;right:0;bottom:0;background:rgba(30,28,24,.96);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+.sum .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{border-top:1px solid var(--line);padding:9px 0;font-size:13px}
+.hist li:first-child{border-top:none}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;z-index:50}
+.toast.show{opacity:1}.toast.err{border-color:var(--rust)}.toast.ok{border-color:var(--green)}
+.empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+.hide{display:none!important}
+
+.olist{display:grid;gap:10px}
+.ord{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:12px;cursor:pointer}
+.ord:hover{border-color:var(--amber)}
+.ord.late{border-left-color:var(--rust)}
+.ord.part{border-left-color:var(--amber)}
+.ord.done{border-left-color:var(--green);opacity:.8}
+.ord.quote{border-left-color:#6FA0C8}
+.ord .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ord .h b{font-size:15px}
+.pill{font-size:11px;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.pill.quote{background:#1C2A36;color:#8FB9DB}.pill.ordered{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+.pill.part{background:var(--amber-dim);color:var(--amber)}.pill.received{background:var(--green-dim);color:var(--green)}
+.pill.late{background:var(--rust-dim);color:#E39A80}.pill.closed{background:var(--panel);color:var(--muted)}
+.prog{height:5px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:var(--green)}
+table.ol{width:100%;border-collapse:collapse;font-size:14px}
+table.ol th{text-align:left;font-size:12px;color:var(--muted);font-weight:500;padding:6px 6px;border-bottom:1px solid var(--line)}
+table.ol td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.ol td.n{text-align:right;white-space:nowrap}
+table.ol tr.out td.n.o{color:var(--amber);font-weight:600}
+table.ol tr.full td{color:var(--muted)}
+.alert{border-color:var(--rust)}
+.alert h2{color:#E39A80}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.kv div:nth-child(odd){color:var(--muted)}
+.backlink{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:0;margin-bottom:10px}
+.line .lrow.r{grid-template-columns:1fr 92px 34px}
+.sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stats div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.stats b{display:block;font-family:var(--font-m);font-size:22px}.stats span{font-size:12px;color:var(--muted)}
+.tlist{display:grid;gap:10px}
+.tool{display:flex;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:8px;padding:10px 12px}
+.tool.out{border-left-color:var(--amber)}.tool.repair{border-left-color:var(--rust)}
+.tool .info{flex:1;cursor:pointer;min-width:0}.tool .h{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.pill.in{background:var(--green-dim);color:var(--green)}.pill.out{background:var(--amber-dim);color:var(--amber)}.pill.repair{background:var(--rust-dim);color:#E39A80}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:90vh;overflow:auto}
+.check{border:1px solid var(--amber);background:var(--amber-dim);border-radius:10px;padding:12px;margin:10px 0}
+.check .ct{font-family:var(--font-m);font-weight:600;font-size:16px;margin-bottom:4px}
+.tick{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;font-weight:600;color:var(--text)}
+.tick input{width:22px;height:22px;accent-color:var(--amber)}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="../icon-192.png" alt=""><div><div class="t">Tools</div><div class="s" id="who">Oak Joinery</div></div></div>
+    <a class="btn btn-sm" href="../">☰ Menu</a>
+  </header>
+  <main id="app"><div class="card muted">Loading…</div></main>
+</div>
+<div id="modal" class="hide"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="../oak-core.js?v=3"></script>
+<script>
+(function(){
+"use strict";
+var S = OakCore.session, esc = OakCore.esc;
+var core = OakCore.createApp({ appId: "tools", readOnly: true });
+var db = null, user = null, busy = false;
+var D = { items:{}, log:{}, locations:[] };
+var ui = { view:"list", filter:"all", search:"", toolId:null,
+  loc:(function(){ try{ return localStorage.getItem("oakToolsLoc") || ""; }catch(e){ return ""; } })() };
+
+function toast(msg, kind){ var t = document.getElementById("toast"); t.textContent = msg; t.className = "toast show " + (kind||""); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.className = "toast"; }, 3400); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function list(v){ return v && typeof v === "object" ? Object.keys(v).map(function(k){ var x = v[k]; if(x && typeof x === "object") x.id = k; return x; }).filter(Boolean) : []; }
+function isRoot(){ return !!(user && user.isRoot); }
+function setLoc(l){ ui.loc = l; try{ localStorage.setItem("oakToolsLoc", l); }catch(e){} }
+function when(ts){ if(!ts) return "—"; var d = new Date(ts); return d.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }) + " " + d.toLocaleTimeString("en-ZA", { hour:"2-digit", minute:"2-digit" }); }
+function daysOut(ts){ return ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 86400000) : 0; }
+function locations(){ return D.locations.length ? D.locations : ["Main"]; }
+function tools(){ return list(D.items).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }); }
+function team(){ return core.getUsers().filter(function(u){ return u && u.username; }).map(function(u){ return u.username; }).sort(); }
+function freshUser(){ var f = S.resolve(core.getUsers()); if(f.status !== "ok"){ S.goHome({ next:"tools" }); return null; } user = f.user; return user; }
+function statusPill(t){
+  if(t.status === "out") return '<span class="pill out">Out — ' + esc((t.out && t.out.to) || "") + (daysOut(t.out && t.out.ts) ? " · " + daysOut(t.out.ts) + "d" : "") + '</span>';
+  if(t.status === "repair") return '<span class="pill repair">Needs repair</span>';
+  return '<span class="pill in">In store</span>';
+}
+
+// ---------- modal ----------
+function openModal(html){ var m = document.getElementById("modal"); m.innerHTML = '<div class="mbg"><div class="mbox">' + html + '</div></div>'; m.classList.remove("hide"); }
+function closeModal(){ var m = document.getElementById("modal"); m.innerHTML = ""; m.classList.add("hide"); }
+
+// ---------- views ----------
+function render(){
+  var root = document.getElementById("app");
+  if(!user) return;
+  var locs = locations();
+  if(ui.loc && locs.indexOf(ui.loc) < 0) setLoc("");
+  if(ui.view === "tool" && D.items[ui.toolId]){ root.innerHTML = viewTool(D.items[ui.toolId]); bind(); return; }
+  if(ui.view === "log"){ root.innerHTML = viewLog(); bind(); return; }
+  ui.view = "list";
+  var all = tools().filter(function(t){ return !ui.loc || t.location === ui.loc; });
+  var q = ui.search.trim().toLowerCase();
+  var shown = all.filter(function(t){
+    if(ui.filter !== "all" && (t.status || "in") !== ui.filter) return false;
+    return !q || [t.name, t.number, t.category, t.out && t.out.to].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  var nOut = all.filter(function(t){ return t.status === "out"; }).length, nRep = all.filter(function(t){ return t.status === "repair"; }).length;
+  var h = '<div class="seg" style="margin-bottom:12px">' + [""].concat(locs).map(function(l){
+    return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '</button>'; }).join("") + '</div>';
+  h += '<div class="stats"><div><b>' + all.length + '</b><span>tools</span></div><div><b>' + (all.length - nOut - nRep) + '</b><span>in store</span></div><div><b style="color:var(--amber)">' + nOut + '</b><span>signed out</span></div><div><b style="color:#E39A80">' + nRep + '</b><span>need repair</span></div></div>';
+  h += '<div class="row" style="margin:12px 0">' + (isRoot() ? '<button class="btn btn-primary" id="addTool">＋ Add tool</button>' : '') + '<button class="btn" id="showLog">History</button></div>';
+  h += '<div class="card"><div class="tabs">' + [["all","All"],["in","In store"],["out","Signed out"],["repair","Needs repair"]].map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
+    '<input id="search" placeholder="Search tool, number or person…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
+  if(!shown.length) h += '<div class="empty">' + (all.length ? "Nothing here." : (isRoot() ? "No tools yet — tap “Add tool”." : "No tools added yet. Ask Sean to add them.")) + '</div>';
+  else h += '<div class="tlist">' + shown.map(function(t){
+    var st = t.status || "in";
+    return '<div class="tool ' + st + '"><div class="info" data-open="' + esc(t.id) + '"><div class="h"><b>' + esc(t.name) + '</b>' + statusPill(t) + '</div>' +
+      '<div class="small muted">' + [t.number ? "#" + esc(t.number) : "", esc(t.category || ""), !ui.loc ? "📍 " + esc(t.location || "") : "", st === "out" && t.out ? "since " + when(t.out.ts) + (t.out.note ? " · " + esc(t.out.note) : "") : ""].filter(Boolean).join(" · ") + '</div></div>' +
+      '<div class="act">' + (st === "in" ? '<button class="btn btn-sm btn-primary" data-out="' + esc(t.id) + '">Sign out</button>' : st === "out" ? '<button class="btn btn-sm btn-primary" data-in="' + esc(t.id) + '">Sign in</button>' : (isRoot() ? '<button class="btn btn-sm" data-fixed="' + esc(t.id) + '">Repaired</button>' : '')) + '</div></div>';
+  }).join("") + '</div>';
+  h += '</div>';
+  root.innerHTML = h; bind();
+}
+function toolLog(id){ return list(D.log).filter(function(e){ return !id || e.toolId === id; }).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); }); }
+function logHtml(entries, showTool){
+  if(!entries.length) return '<div class="empty">Nothing yet.</div>';
+  return '<ul class="hist">' + entries.slice(0, 150).map(function(e){
+    var what = { out:"Signed out to <b>" + esc(e.to) + "</b>", in:"Signed in by <b>" + esc(e.to) + "</b>" + (e.condition === "problem" ? ' — <span style="color:#E39A80">problem found</span>' : ' — checked ✓'), repaired:"Marked repaired", added:"Added", edited:"Edited" }[e.action] || esc(e.action);
+    return '<li>' + (showTool ? '<b>' + esc(e.toolName) + '</b> · ' : '') + what + (e.note ? '<div class="muted small">' + esc(e.note) + '</div>' : '') + '<div class="muted small">' + when(e.ts) + ' · by ' + esc(e.by) + (e.location ? ' · ' + esc(e.location) : '') + '</div></li>';
+  }).join("") + '</ul>';
+}
+function viewTool(t){
+  var h = '<button class="backlink" id="back">← All tools</button><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(t.name) + '</h2>' + statusPill(t) + '</div>' +
+    '<div class="kv" style="margin-top:10px"><div>Number</div><div>' + esc(t.number || "—") + '</div><div>Category</div><div>' + esc(t.category || "—") + '</div><div>Location</div><div>' + esc(t.location || "—") + '</div>' +
+    (t.status === "out" && t.out ? '<div>Signed out to</div><div>' + esc(t.out.to) + ' · ' + when(t.out.ts) + (t.out.note ? ' · ' + esc(t.out.note) : '') + '</div>' : '') +
+    (t.status === "repair" && t.repairNote ? '<div>Problem</div><div>' + esc(t.repairNote) + '</div>' : '') + '</div>' +
+    '<div class="row" style="margin-top:14px">' + ((t.status || "in") === "in" ? '<button class="btn btn-primary" data-out="' + esc(t.id) + '">Sign out</button>' : t.status === "out" ? '<button class="btn btn-primary" data-in="' + esc(t.id) + '">Sign in</button>' : (isRoot() ? '<button class="btn" data-fixed="' + esc(t.id) + '">Mark repaired</button>' : '')) +
+    (isRoot() ? '<button class="btn" id="editTool">Edit</button><button class="btn" id="delTool" style="color:#E39A80">Remove</button>' : '') + '</div></div>' +
+    '<div class="card"><h2>History</h2>' + logHtml(toolLog(t.id), false) + '</div>';
+  return h;
+}
+function viewLog(){
+  var e = toolLog(null).filter(function(x){ return !ui.loc || x.location === ui.loc; });
+  return '<button class="backlink" id="back">← All tools</button><div class="card"><h2>Tool history' + (ui.loc ? " — " + esc(ui.loc) : "") + '</h2>' + logHtml(e, true) + '</div>';
+}
+
+// ---------- actions ----------
+async function writeLog(t, action, extra){
+  var e = Object.assign({ ts:new Date().toISOString(), toolId:t.id, toolName:t.name, action:action, by:user.username, location:t.location || "" }, extra || {});
+  await db.ref("tools/log/" + uid()).set(e);
+}
+function signOutModal(t){
+  var names = team();
+  openModal('<h2>Sign out: ' + esc(t.name) + '</h2>' +
+    '<label>Who is taking it?</label><select id="mTo">' + names.map(function(n){ return '<option' + (n === user.username ? " selected" : "") + '>' + esc(n) + '</option>'; }).join("") + '<option value="__other">Someone else…</option></select>' +
+    '<div id="mOtherWrap" class="hide"><label>Name</label><input id="mOther" placeholder="e.g. contractor name"></div>' +
+    '<label>Job / reason (optional)</label><input id="mNote" placeholder="e.g. NH Hotel install">' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Sign out</button></div>');
+  var sel = document.getElementById("mTo");
+  sel.onchange = function(){ document.getElementById("mOtherWrap").classList.toggle("hide", sel.value !== "__other"); };
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    var to = sel.value === "__other" ? document.getElementById("mOther").value.trim() : sel.value;
+    if(!to){ toast("Enter who is taking it.", "err"); return; }
+    if(!freshUser()) return;
+    var note = document.getElementById("mNote").value.trim(), ts = new Date().toISOString();
+    try{
+      var res = await db.ref("tools/items/" + t.id).transaction(function(cur){ if(!cur) return; if(cur.status === "out" || cur.status === "repair") return; cur.status = "out"; cur.out = { to:to, by:user.username, ts:ts, note:note }; return cur; });
+      if(!res.committed){ toast("Someone else has just signed this tool out — refresh.", "err"); return; }
+      await writeLog(t, "out", { to:to, note:note });
+      closeModal(); toast(t.name + " signed out to " + to + ".", "ok");
+    }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+// The check pop-up: the tool can only go back in once it has been checked.
+function signInModal(t){
+  var had = (t.out && t.out.to) || "";
+  openModal('<h2>Sign in: ' + esc(t.name) + '</h2>' +
+    '<p class="small muted" style="margin-top:0">Signed out to <b>' + esc(had) + '</b> · ' + when(t.out && t.out.ts) + '</p>' +
+    '<div class="check"><div class="ct">🔍 Check the tool</div><div class="small muted">Before it goes back: is it clean, complete (blades, bits, batteries, cases, cables) and working?</div>' +
+    '<label class="tick"><input type="checkbox" id="mChecked"> <span>I have checked the tool</span></label>' +
+    '<div class="seg" style="margin-top:10px"><button type="button" data-cond="ok" class="on">✓ All good</button><button type="button" data-cond="problem">⚠ Problem found</button></div>' +
+    '<div id="mProbWrap" class="hide"><label>What\'s wrong?</label><input id="mProb" placeholder="e.g. blade chipped, charger missing"></div></div>' +
+    '<label>Returned by</label><input id="mBy" value="' + esc(had) + '">' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk" disabled>Sign in</button></div>');
+  var cond = "ok", chk = document.getElementById("mChecked"), ok = document.getElementById("mOk");
+  chk.onchange = function(){ ok.disabled = !chk.checked; };
+  document.querySelectorAll("[data-cond]").forEach(function(b){ b.onclick = function(){ cond = b.getAttribute("data-cond"); document.querySelectorAll("[data-cond]").forEach(function(x){ x.classList.toggle("on", x === b); }); document.getElementById("mProbWrap").classList.toggle("hide", cond !== "problem"); }; });
+  document.getElementById("mCancel").onclick = closeModal;
+  ok.onclick = async function(){
+    if(!chk.checked){ toast("Tick that you've checked the tool first.", "err"); return; }
+    var prob = document.getElementById("mProb").value.trim();
+    if(cond === "problem" && !prob){ toast("Say what's wrong with it.", "err"); return; }
+    var by = document.getElementById("mBy").value.trim() || had;
+    if(!freshUser()) return;
+    try{
+      var res = await db.ref("tools/items/" + t.id).transaction(function(cur){ if(!cur) return; cur.status = cond === "problem" ? "repair" : "in"; cur.out = null; cur.repairNote = cond === "problem" ? prob : null; cur.lastIn = new Date().toISOString(); return cur; });
+      if(!res.committed){ toast("Couldn't save — refresh and try again.", "err"); return; }
+      await writeLog(t, "in", { to:by, checked:true, condition:cond, note: cond === "problem" ? prob : "" });
+      closeModal(); toast(cond === "problem" ? t.name + " signed in and marked for repair." : t.name + " signed in — checked ✓", "ok");
+    }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+function editModal(t){
+  var locs = locations(), n = t || { location: ui.loc || locs[0] };
+  openModal('<h2>' + (t ? "Edit tool" : "Add a tool") + '</h2>' +
+    '<label>Tool name</label><input id="eName" value="' + esc(n.name || "") + '" placeholder="e.g. Makita 18V drill">' +
+    '<div class="grid2"><div><label>Number / serial (optional)</label><input id="eNum" value="' + esc(n.number || "") + '" placeholder="e.g. T-014"></div>' +
+    '<div><label>Category (optional)</label><input id="eCat" list="catList" value="' + esc(n.category || "") + '" placeholder="e.g. Power tools"><datalist id="catList">' + Array.from(new Set(tools().map(function(x){ return x.category; }).filter(Boolean))).map(function(c){ return '<option value="' + esc(c) + '">'; }).join("") + '</datalist></div></div>' +
+    '<label>Location</label><select id="eLoc">' + locs.map(function(l){ return '<option' + (l === n.location ? " selected" : "") + '>' + esc(l) + '</option>'; }).join("") + '</select>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">' + (t ? "Save" : "Add tool") + '</button></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    var name = document.getElementById("eName").value.trim();
+    if(!name){ toast("Enter the tool name.", "err"); return; }
+    if(!freshUser() || !isRoot()) return;
+    var rec = { name:name, number:document.getElementById("eNum").value.trim(), category:document.getElementById("eCat").value.trim(), location:document.getElementById("eLoc").value };
+    try{
+      if(t){ await db.ref("tools/items/" + t.id).update(rec); await writeLog(Object.assign({}, t, rec), "edited"); }
+      else { var id = uid(); rec.status = "in"; rec.added = new Date().toISOString(); await db.ref("tools/items/" + id).set(rec); await writeLog(Object.assign({ id:id }, rec), "added"); }
+      closeModal(); toast(name + (t ? " saved." : " added."), "ok");
+    }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+
+// ---------- events ----------
+function bind(){
+  var q = function(s){ return document.querySelector(s); }, qa = function(s){ return document.querySelectorAll(s); };
+  qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
+  qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
+  if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var p = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(p, p); }catch(e){} };
+  qa("[data-open]").forEach(function(c){ c.onclick = function(){ ui.toolId = c.getAttribute("data-open"); ui.view = "tool"; render(); window.scrollTo(0,0); }; });
+  qa("[data-out]").forEach(function(b){ b.onclick = function(){ var t = D.items[b.getAttribute("data-out")]; t.id = b.getAttribute("data-out"); signOutModal(t); }; });
+  qa("[data-in]").forEach(function(b){ b.onclick = function(){ var t = D.items[b.getAttribute("data-in")]; t.id = b.getAttribute("data-in"); signInModal(t); }; });
+  qa("[data-fixed]").forEach(function(b){ b.onclick = async function(){ var id = b.getAttribute("data-fixed"), t = D.items[id]; t.id = id;
+    if(!confirm("Mark " + t.name + " as repaired and back in store?") || !freshUser()) return;
+    await db.ref("tools/items/" + id).update({ status:"in", repairNote:null }); await writeLog(t, "repaired"); toast(t.name + " is back in store.", "ok"); }; });
+  if(q("#addTool")) q("#addTool").onclick = function(){ editModal(null); };
+  if(q("#showLog")) q("#showLog").onclick = function(){ ui.view = "log"; render(); window.scrollTo(0,0); };
+  if(q("#back")) q("#back").onclick = function(){ ui.view = "list"; render(); };
+  var t = ui.view === "tool" ? D.items[ui.toolId] : null;
+  if(t){ t.id = ui.toolId;
+    if(q("#editTool")) q("#editTool").onclick = function(){ editModal(t); };
+    if(q("#delTool")) q("#delTool").onclick = async function(){ if(!confirm("Remove " + t.name + " from the tool list? Its history is kept.") || !freshUser()) return;
+      await db.ref("tools/items/" + t.id).remove(); await writeLog(t, "removed"); ui.view = "list"; toast(t.name + " removed.", "ok"); render(); };
+  }
+}
+
+// ---------- start ----------
+var started = false;
+function start(){
+  if(started) return; started = true;
+  db = firebase.database();
+  var rr = function(){ if(!busy && document.getElementById("modal").classList.contains("hide")) render(); else if(!busy) render.pending = true; };
+  db.ref("tools/items").on("value", function(s){ D.items = s.val() || {}; rr(); });
+  db.ref("tools/log").limitToLast(400).on("value", function(s){ D.log = s.val() || {}; rr(); });
+  // locations come from Board Stock / Consumables so the branches match everywhere
+  var a = [], b = [];
+  var mergeLocs = function(){ var out = []; a.concat(b).forEach(function(l){ if(l && out.indexOf(l) < 0) out.push(l); }); D.locations = out; rr(); };
+  db.ref("boardStock/locations").on("value", function(s){ a = s.val() || []; mergeLocs(); });
+  db.ref("consumablesStock/meta/locations").on("value", function(s){ b = s.val() || []; mergeLocs(); });
+  render();
+}
+var _close = closeModal;
+closeModal = function(){ _close(); if(render.pending){ render.pending = false; render(); } };
+try{
+  core.init();
+  core.startUsersSync(function(users){
+    var r = S.resolve(users);
+    if(r.status === "wait") return;
+    if(r.status !== "ok"){ S.goHome({ next:"tools" }); return; }
+    user = r.user; document.getElementById("who").textContent = user.username;
+    start();
+  });
+}catch(e){ document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>'; }
+if(!S.get()) S.goHome({ next:"tools" });
+})();
+</script>
+</body>
+</html>
