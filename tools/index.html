@@ -170,6 +170,7 @@ function closeModal(){ var m = document.getElementById("modal"); m.innerHTML = "
 function render(){
   var root = document.getElementById("app");
   if(!user) return;
+  if(!core.userHasApp(user, "tools")){ root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">You don\'t have access to Tools. Ask Sean to tick "Tools app" for you in Dispatch → Manage users.</p><a class="btn" href="../">Back to menu</a></div>'; return; }
   var locs = locations();
   if(ui.loc && locs.indexOf(ui.loc) < 0) setLoc("");
   if(ui.view === "tool" && D.items[ui.toolId]){ root.innerHTML = viewTool(D.items[ui.toolId]); bind(); return; }
