@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery Users — add people, set PINs and choose which apps each person can use.">
+<title>Users</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="../manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{--bg:#1E1C18;--panel:#26221C;--panel-2:#2E2A22;--text:#EFE8D8;--muted:#9C9280;--amber:#E3A23A;--amber-dim:#3B2E1A;--line:#433D32;--green:#5FA76E;--green-dim:#1F3325;--rust:#C46A4A;--rust-dim:#3A231B;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;--font-m:"Space Grotesk","Inter",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.wrap{max-width:760px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px}
+.brand .s{font-size:12px;color:var(--muted)}
+h2{font-family:var(--font-m);font-weight:600;font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber-dim);color:var(--amber);font-size:12px;font-weight:600;margin-right:8px;vertical-align:1px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px 10px;font:inherit;font-weight:600;cursor:pointer}
+.seg button.on{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font:inherit;font-size:15px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);text-decoration:none}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn-sm{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amber);background:var(--amber-dim)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--amber);border-color:var(--amber)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+.bar{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .2s}
+.lines{display:grid;gap:10px}
+.line{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.line.ok{border-left-color:var(--green)}
+.line.check{border-left-color:var(--amber)}
+.line.new{border-left-color:#6FA0C8}
+.line.skip{opacity:.55}
+.line .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-word;margin-bottom:6px}
+.line .lrow{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:center}
+.line .unit{font-size:12px;color:var(--muted)}
+.line .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.line .newf{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.line .newf label{margin:0 0 3px}
+.tag{font-size:11px;border-radius:99px;padding:2px 8px;margin-left:6px}
+.tag.ok{background:var(--green-dim);color:var(--green)}.tag.check{background:var(--amber-dim);color:var(--amber)}.tag.new{background:#1C2A36;color:#8FB9DB}
+.sum{position:fixed;left:0;right:0;bottom:0;background:rgba(30,28,24,.96);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+.sum .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{border-top:1px solid var(--line);padding:9px 0;font-size:13px}
+.hist li:first-child{border-top:none}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;z-index:50}
+.toast.show{opacity:1}.toast.err{border-color:var(--rust)}.toast.ok{border-color:var(--green)}
+.empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+.hide{display:none!important}
+
+.olist{display:grid;gap:10px}
+.ord{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:12px;cursor:pointer}
+.ord:hover{border-color:var(--amber)}
+.ord.late{border-left-color:var(--rust)}
+.ord.part{border-left-color:var(--amber)}
+.ord.done{border-left-color:var(--green);opacity:.8}
+.ord.quote{border-left-color:#6FA0C8}
+.ord .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ord .h b{font-size:15px}
+.pill{font-size:11px;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.pill.quote{background:#1C2A36;color:#8FB9DB}.pill.ordered{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+.pill.part{background:var(--amber-dim);color:var(--amber)}.pill.received{background:var(--green-dim);color:var(--green)}
+.pill.late{background:var(--rust-dim);color:#E39A80}.pill.closed{background:var(--panel);color:var(--muted)}
+.prog{height:5px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:var(--green)}
+table.ol{width:100%;border-collapse:collapse;font-size:14px}
+table.ol th{text-align:left;font-size:12px;color:var(--muted);font-weight:500;padding:6px 6px;border-bottom:1px solid var(--line)}
+table.ol td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.ol td.n{text-align:right;white-space:nowrap}
+table.ol tr.out td.n.o{color:var(--amber);font-weight:600}
+table.ol tr.full td{color:var(--muted)}
+.alert{border-color:var(--rust)}
+.alert h2{color:#E39A80}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.kv div:nth-child(odd){color:var(--muted)}
+.backlink{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:0;margin-bottom:10px}
+.line .lrow.r{grid-template-columns:1fr 92px 34px}
+.sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stats div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.stats b{display:block;font-family:var(--font-m);font-size:22px}.stats span{font-size:12px;color:var(--muted)}
+.tlist{display:grid;gap:10px}
+.tool{display:flex;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:8px;padding:10px 12px}
+.tool.out{border-left-color:var(--amber)}.tool.repair{border-left-color:var(--rust)}
+.tool .info{flex:1;cursor:pointer;min-width:0}.tool .h{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.pill.in{background:var(--green-dim);color:var(--green)}.pill.out{background:var(--amber-dim);color:var(--amber)}.pill.repair{background:var(--rust-dim);color:#E39A80}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:440px;max-height:90vh;overflow:auto}
+.check{border:1px solid var(--amber);background:var(--amber-dim);border-radius:10px;padding:12px;margin:10px 0}
+.check .ct{font-family:var(--font-m);font-weight:600;font-size:16px;margin-bottom:4px}
+.tick{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;font-weight:600;color:var(--text)}
+.tick input{width:22px;height:22px;accent-color:var(--amber)}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+.ulist{display:grid;gap:8px}
+.urow{display:flex;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.uinfo{flex:1;min-width:0}.urow .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill.main{background:var(--amber-dim);color:var(--amber)}.pill.root{background:var(--green-dim);color:var(--green)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.chip{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:2px 8px;color:var(--muted)}
+.psec{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px}
+.phead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px}
+.phead:last-child{border-bottom:none;padding-bottom:0}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:10px}
+.tick.sm{font-size:13px;font-weight:400;align-items:flex-start}.tick.sm input{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+@media(max-width:560px){.pgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="../icon-192.png" alt=""><div><div class="t">Users</div><div class="s" id="who">Oak Joinery</div></div></div>
+    <a class="btn btn-sm" href="../">☰ Menu</a>
+  </header>
+  <main id="app"><div class="card muted">Loading…</div></main>
+</div>
+<div id="modal" class="hide"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="../oak-core.js?v=3"></script>
+<script>
+(function(){
+"use strict";
+// Oak Joinery — Users (2026-09-30). One place to add people, set their PIN and
+// choose which apps they can open and what they may do in each. Replaces the
+// "Manage users" screen that used to live inside Dispatch. Saves through
+// OakCore's merge-safe saveUsers(), so it can't undo changes made elsewhere.
+var S = OakCore.session, esc = OakCore.esc;
+var core = OakCore.createApp({ appId: "users", readOnly: false });
+var user = null, busy = false, ui = { editId: null, search: "" };
+
+var LABELS = {
+  addItems:"Add items", removeItems:"Remove items", markFinished:"Mark finished (move Unfinished → Finished)", moveItems:"Move items (mark ready / add to delivery note)",
+  returnToStock:"Return items to stock (undo a mistaken send from Stock List, Board Stock or Consumables)", manageNotes:"Manage delivery notes (view, sign)",
+  manageTypes:"Manage item catalog", exportData:"Download sheet / combine duplicates",
+  markBuilt:"Mark stock items as built", renameCategories:"Rename stock categories", stockAddQty:"Add stock — the + button", stockRemoveQty:"Minimize stock — the − button",
+  stockEditItems:"Edit item details", copyJobs:"Copy a job with its recipe",
+  boardAddBoard:"Add Boards", boardAddQty:"Add Stock", boardRemoveQty:"Remove Stock", boardSendToDispatch:"Send to Dispatch", boardExportData:"Print / share stock PDF", boardViewLog:"Activity Log", boardSettings:"App Settings",
+  consManageItems:"Add/edit items & reorder levels", consHandOut:"Hand out items", consManageConsumables:"Update container fill levels / liquid volumes", consViewReports:"View reports", consExportExcel:"Export to Excel", consSendToDispatch:"Send to Dispatch",
+  ordersQuotes:"Add / upload quotes", ordersApprove:"Approve quotes & send purchase orders",
+  manageUsers:"Manage users (open this Users app)"
+};
+var MAIN_ONLY = ["ordersQuotes", "ordersApprove", "manageUsers"];
+var GROUPS = [
+  { app:"dispatch", title:"Dispatch", keys:["addItems","removeItems","markFinished","moveItems","returnToStock","manageNotes","manageTypes","exportData"] },
+  { app:"stock", title:"Stock List", keys:["markBuilt","renameCategories","stockAddQty","stockRemoveQty","stockEditItems","copyJobs"] },
+  { app:"boardStock", title:"Board Stock", keys:["boardAddBoard","boardAddQty","boardRemoveQty","boardSendToDispatch","boardExportData","boardViewLog","boardSettings"] },
+  { app:"consumables", title:"Consumables", keys:["consManageItems","consHandOut","consManageConsumables","consViewReports","consExportExcel","consSendToDispatch"] },
+  { app:"orders", title:"Orders", note:"receiving deliveries uses the Add Stock ticks in Board Stock / Consumables", keys:["ordersQuotes","ordersApprove"] },
+  { app:"stockIn", title:"Stock In", note:"adds to whichever of Board Stock / Consumables / Stock List they have Add Stock for", keys:[] },
+  { app:"tools", title:"Tools", note:"sign tools out and in; only root adds, edits or removes tools", keys:[] },
+  { app:null, title:"Users", note:"this app", keys:["manageUsers"] }
+];
+var APP_NAMES = {}; GROUPS.forEach(function(g){ if(g.app) APP_NAMES[g.app] = g.title; });
+
+function toast(msg, kind){ var t = document.getElementById("toast"); t.textContent = msg; t.className = "toast show " + (kind||""); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.className = "toast"; }, 3400); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function isMain(u){ return !!(u && core.isMainRoot(u)); }
+function iAmMain(){ return isMain(user); }
+function canManage(u){ return !!(u && (isMain(u) || u.isRoot || (u.permissions && u.permissions.manageUsers))); }
+function team(){ return core.getUsers().filter(function(u){ return u && u.username; }); }
+function appsOf(u){ return Object.keys(APP_NAMES).filter(function(a){ return core.userHasApp(u, a); }); }
+function freshUser(){ var f = S.resolve(core.getUsers()); if(f.status !== "ok"){ S.goHome({ next:"users" }); return null; } user = f.user; return user; }
+
+// ---------- views ----------
+function render(){
+  var root = document.getElementById("app");
+  if(!user) return;
+  if(!canManage(user)){ root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">Only the main root, and people given "Manage users", can manage users.</p><a class="btn" href="../">Back to menu</a></div>'; return; }
+  if(ui.editId) { root.innerHTML = viewEdit(ui.editId === "new" ? null : team().find(function(u){ return u.id === ui.editId; })); bindEdit(); return; }
+  var q = ui.search.trim().toLowerCase();
+  var list = team().filter(function(u){ return !q || u.username.toLowerCase().indexOf(q) >= 0; })
+    .sort(function(a,b){ return (isMain(b) - isMain(a)) || (!!b.isRoot - !!a.isRoot) || a.username.localeCompare(b.username); });
+  var h = '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="addUser">＋ Add user</button></div>' +
+    '<div class="card"><input id="search" placeholder="Search people…" value="' + esc(ui.search) + '" style="margin-bottom:12px">' +
+    '<div class="ulist">' + list.map(function(u){
+      var tag = isMain(u) ? '<span class="pill main">Main root — everything</span>' : u.isRoot ? '<span class="pill root">Root</span>' : '';
+      var apps = isMain(u) ? [] : appsOf(u);
+      var canEdit = !(isMain(u) && !iAmMain());
+      return '<div class="urow"><div class="uinfo"><div class="h"><b>' + esc(u.username) + '</b>' + tag + (u.id === user.id ? '<span class="small muted">(you)</span>' : '') + '</div>' +
+        (isMain(u) ? '' : '<div class="chips">' + (apps.length ? apps.map(function(a){ return '<span class="chip">' + esc(APP_NAMES[a]) + '</span>'; }).join("") : '<span class="small muted">No apps</span>') + '</div>') + '</div>' +
+        (canEdit ? '<button class="btn btn-sm" data-edit="' + esc(u.id) + '">Edit</button>' : '') + '</div>';
+    }).join("") + '</div></div>' +
+    '<p class="small muted">' + (iAmMain() ? 'You are the main root: only you can change which apps people can open, make someone root, or give the Orders and Manage-users ticks.' : 'Only the main root can change app access, root, and the Orders / Manage-users ticks — those show greyed out for you.') + '</p>';
+  root.innerHTML = h;
+  var s = document.getElementById("search");
+  s.oninput = function(){ ui.search = this.value; var p = this.selectionStart; render(); var n = document.getElementById("search"); n.focus(); try{ n.setSelectionRange(p, p); }catch(e){} };
+  document.getElementById("addUser").onclick = function(){ ui.editId = "new"; render(); window.scrollTo(0,0); };
+  document.querySelectorAll("[data-edit]").forEach(function(b){ b.onclick = function(){ ui.editId = b.getAttribute("data-edit"); render(); window.scrollTo(0,0); }; });
+}
+function viewEdit(u){
+  var main = iAmMain(), editingMain = isMain(u);
+  var perms = (u && u.permissions) || {};
+  if(u && perms.markFinished === undefined) perms.markFinished = !!perms.moveItems;
+  var apps = u ? (u.apps || { dispatch:true, stock:true, boardStock:true, consumables:true }) : { dispatch:true };
+  var h = '<button class="backlink" id="back">← All users</button><div class="card"><h2>' + (u ? "Edit " + esc(u.username) : "Add a user") + '</h2>' +
+    '<div class="grid2"><div><label>Name</label><input id="fName" value="' + esc(u ? u.username : "") + '" placeholder="e.g. Thabo"></div>' +
+    '<div><label>PIN</label><input id="fPin" type="text" inputmode="numeric" autocomplete="off" placeholder="' + (u ? "Leave blank to keep the current PIN" : "At least 4 digits") + '"></div></div>' +
+    (editingMain ? '<p class="small muted">This is the main root account — it can always open every app and do everything.</p>' :
+      '<label class="tick" style="margin-top:14px' + (main ? '' : ';opacity:.5') + '"><input type="checkbox" id="fRoot"' + (u && u.isRoot ? " checked" : "") + (main ? '' : ' disabled') + '> <span>Full access (root) — can do everything in the apps they can open</span></label>' +
+      '<p class="small muted" style="margin:6px 0 0">Tick the apps this person can open, then what they may do in each.</p>' +
+      GROUPS.map(function(g){
+        return '<div class="psec"><div class="phead">' + (g.app ? '<label class="tick"><input type="checkbox" class="appCheck" data-app="' + g.app + '"' + (apps[g.app] ? " checked" : "") + (main ? '' : ' disabled') + '> <span>' + esc(g.title) + '</span></label>' : '<b>' + esc(g.title) + '</b>') +
+          (g.note ? '<span class="small muted">' + esc(g.note) + '</span>' : '') + '</div>' +
+          (g.keys.length ? '<div class="pgrid">' + g.keys.map(function(k){ var mo = MAIN_ONLY.indexOf(k) >= 0, dis = mo && !main;
+            return '<label class="tick sm"' + (dis ? ' style="opacity:.5"' : '') + '><input type="checkbox" class="permCheck" data-key="' + k + '"' + (perms[k] ? " checked" : "") + (dis ? ' disabled data-mainonly="1"' : '') + '> <span>' + esc(LABELS[k]) + (mo ? ' <span class="small muted">(main root only)</span>' : '') + '</span></label>'; }).join("") + '</div>' : '') + '</div>';
+      }).join("")) +
+    '<div class="row" style="justify-content:space-between;margin-top:16px">' +
+      (u && !editingMain && u.id !== user.id ? '<button class="btn" id="delUser" style="color:#E39A80">Remove user</button>' : '<span></span>') +
+      '<div class="row"><button class="btn" id="cancel">Cancel</button><button class="btn btn-primary" id="save">' + (u ? "Save changes" : "Add user") + '</button></div></div></div>';
+  return h;
+}
+function bindEdit(){
+  var q = function(s){ return document.querySelector(s); };
+  var u = ui.editId === "new" ? null : team().find(function(x){ return x.id === ui.editId; });
+  var back = function(){ ui.editId = null; render(); window.scrollTo(0,0); };
+  q("#back").onclick = back; q("#cancel").onclick = back;
+  var rootT = q("#fRoot");
+  var lock = function(){ document.querySelectorAll(".pgrid").forEach(function(g){ g.style.opacity = rootT && rootT.checked ? ".4" : "1"; });
+    document.querySelectorAll(".permCheck").forEach(function(c){ c.disabled = (rootT && rootT.checked) || c.getAttribute("data-mainonly") === "1"; }); };
+  if(rootT){ rootT.onchange = lock; lock(); }
+  q("#save").onclick = function(){ save(u); };
+  if(q("#delUser")) q("#delUser").onclick = function(){ removeUser(u); };
+}
+
+// ---------- saving ----------
+async function save(u){
+  if(busy) return;
+  if(!freshUser() || !canManage(user)) return;
+  var main = iAmMain(), list = team();
+  var name = document.getElementById("fName").value.trim(), pin = document.getElementById("fPin").value.trim();
+  if(!name){ toast("Enter a name.", "err"); return; }
+  if(list.some(function(x){ return x.username.toLowerCase() === name.toLowerCase() && (!u || x.id !== u.id); })){ toast("That name is already taken.", "err"); return; }
+  if(!u && pin.length < 4){ toast("Enter a PIN of at least 4 digits.", "err"); return; }
+  if(pin && pin.length < 4){ toast("The PIN must be at least 4 digits (or leave it blank).", "err"); return; }
+  if(u && isMain(u) && !main){ toast("Only the main root can edit the main root account.", "err"); return; }
+  var rec = u ? JSON.parse(JSON.stringify(u)) : { id:uid(), permissions:{}, apps:{} };
+  rec.username = name;
+  if(pin) rec.pin = await OakCore.hashPin(pin);
+  if(!isMain(rec)){
+    rec.permissions = rec.permissions || {};
+    Object.keys(LABELS).forEach(function(k){ if(rec.permissions[k] === undefined) rec.permissions[k] = false; });
+    document.querySelectorAll(".permCheck").forEach(function(c){ if(c.getAttribute("data-mainonly") === "1") return; rec.permissions[c.dataset.key] = c.checked; });
+    if(main){
+      rec.isRoot = !!(document.getElementById("fRoot") || {}).checked;
+      rec.apps = rec.apps || {};
+      document.querySelectorAll(".appCheck").forEach(function(c){ rec.apps[c.dataset.app] = c.checked; });
+    } else if(!u){ rec.isRoot = false; rec.apps = { dispatch:true }; }
+  }
+  var next = u ? list.map(function(x){ return x.id === u.id ? rec : x; }) : list.concat([rec]);
+  busy = true;
+  try{ await core.saveUsers(next); toast(name + (u ? " saved." : " added."), "ok"); ui.editId = null; }
+  catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  busy = false; render();
+}
+async function removeUser(u){
+  if(!u || !freshUser() || !canManage(user)) return;
+  var list = team();
+  if(isMain(u)){ toast("You can't remove the main root account.", "err"); return; }
+  if(u.id === user.id){ toast("You can't remove yourself.", "err"); return; }
+  if(u.isRoot && !iAmMain()){ toast("Only the main root can remove a root account.", "err"); return; }
+  if(!confirm("Remove " + u.username + "? They won't be able to log in any more.")) return;
+  busy = true;
+  try{ await core.saveUsers(list.filter(function(x){ return x.id !== u.id; })); toast(u.username + " removed.", "ok"); ui.editId = null; }
+  catch(e){ toast("Couldn't remove: " + (e.message || e), "err"); }
+  busy = false; render();
+}
+
+// ---------- start ----------
+try{
+  core.init();
+  core.startUsersSync(function(users){
+    var r = S.resolve(users);
+    if(r.status === "wait") return;
+    if(r.status !== "ok"){ S.goHome({ next:"users" }); return; }
+    user = r.user; document.getElementById("who").textContent = user.username;
+    if(!busy && !ui.editId) render(); else if(!busy && ui.editId && !document.getElementById("fName")) render();
+  });
+}catch(e){ document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>'; }
+if(!S.get()) S.goHome({ next:"users" });
+})();
+</script>
+<script>
+/* Oak Joinery — shared "← Back" button (2026-09-30, per Sean: "let's put back
+   buttons in all apps"). Adds a Back button next to every "☰ Menu" button and
+   makes the phone's own back button do the same thing. Back goes, in order:
+     1. out of an open pop-up (a delivery note opened from the list goes back
+        to the list),
+     2. to the previous screen in the app (Orders / Tools detail pages, or the
+        last tab you were on),
+     3. to the Oak Joinery menu.
+   Apps can tell it about their tabs with window.OAK_BACK_TABS = { get, set }. */
+(function(){
+  "use strict";
+  if (window.__oakBack) return; window.__oakBack = true;
+  var tabStack = [], lastTab = null, goingBack = false;
+
+  function visible(el){
+    if (!el || !el.isConnected) return false;
+    var cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  var OVERLAYS = "#noteBg, #allBg, .modal-bg, .modal-overlay, .mbg, #modal-root .modal-backdrop, #modal-root > div";
+  function topOverlay(){
+    var list = Array.prototype.slice.call(document.querySelectorAll(OVERLAYS)).filter(visible)
+      .filter(function(el){ return el.id !== "loginOverlay" && !el.closest("#loginOverlay") && !/login/i.test(el.id || ""); });
+    return list.length ? list[list.length - 1] : null;
+  }
+  function closeButtonIn(el){
+    var b = el.querySelector(".note-back");
+    if (b && visible(b)) return b;
+    var btns = Array.prototype.slice.call(el.querySelectorAll("button")).filter(visible);
+    return btns.find(function(x){ return /(^|\s)(close-x|modal-close)(\s|$)/.test(x.className) || x.id === "mCancel" || x.id === "modal-cancel"; }) ||
+           btns.find(function(x){ return /^\s*(cancel|close|done|back|×|✕)\s*$/i.test(x.textContent); }) || null;
+  }
+  function goMenu(){
+    try { if (window.OakCore && OakCore.session && OakCore.session.get()) { OakCore.session.goHome(); return; } } catch (e) {}
+    location.href = "https://seanoakjoinery.github.io/oak-core/";
+  }
+  function back(){
+    var ov = topOverlay();
+    if (ov){
+      var b = closeButtonIn(ov);
+      if (b){ b.click(); return true; }
+      if (typeof window.closeModal === "function"){ window.closeModal(); return true; }
+      ov.remove(); return true;
+    }
+    var link = Array.prototype.slice.call(document.querySelectorAll(".backlink#back, #back.backlink")).filter(visible)[0];
+    if (link){ link.click(); return true; }
+    var T = window.OAK_BACK_TABS;
+    if (T && tabStack.length){
+      goingBack = true;
+      var t = tabStack.pop(); lastTab = t;
+      try { T.set(t); } finally { goingBack = false; }
+      return true;
+    }
+    goMenu(); return false;
+  }
+  window.oakBack = back;
+
+  // Remember the tab you came from.
+  function trackTab(){
+    var T = window.OAK_BACK_TABS; if (!T) return;
+    var cur; try { cur = T.get(); } catch (e) { return; }
+    if (cur === undefined || cur === null) return;
+    if (lastTab !== null && cur !== lastTab && !goingBack){ tabStack.push(lastTab); if (tabStack.length > 30) tabStack.shift(); }
+    lastTab = cur;
+  }
+
+  // Put a Back button in front of every Menu button (apps redraw, so keep checking).
+  function addButtons(){
+    var menus = Array.prototype.slice.call(document.querySelectorAll("button, a")).filter(function(x){
+      return /☰\s*Menu/.test(x.textContent || "") && !x.dataset.oakBackDone;
+    });
+    menus.forEach(function(m){
+      m.dataset.oakBackDone = "1";
+      var b = document.createElement(m.tagName === "A" ? "button" : m.tagName);
+      b.type = "button";
+      b.className = m.className;
+      b.setAttribute("style", (m.getAttribute("style") || "") + ";margin-right:6px");
+      b.textContent = "← Back";
+      b.title = "Back to the previous screen";
+      b.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); back(); });
+      m.parentNode.insertBefore(b, m);
+    });
+  }
+  function tick(){ addButtons(); trackTab(); }
+  new MutationObserver(tick).observe(document.documentElement, { childList:true, subtree:true });
+  document.addEventListener("click", function(){ setTimeout(trackTab, 0); }, true);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+
+  // The phone's own back button does the same as the Back button.
+  try {
+    history.pushState({ oakBack:1 }, "");
+    window.addEventListener("popstate", function(){
+      var stay = back();
+      if (stay) history.pushState({ oakBack:1 }, "");
+    });
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
