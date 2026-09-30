@@ -104,6 +104,9 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
     { id:"tools",       name:"Tools",       desc:"Sign tools out & in", url:"/oak-core/tools/",
       icon:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
       visible: function(u){ return core.userHasApp(u, "tools"); } },
+    { id:"suppliers",   name:"Suppliers",   desc:"Contacts, numbers & addresses", url:"/oak-core/suppliers/",
+      icon:'<path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01"/>',
+      visible: function(u){ return core.userHasApp(u, "suppliers"); } },
     { id:"users",       name:"Users",       desc:"People, PINs & app access", url:"/oak-core/users/",
       icon:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c2.3.1 4.2 1.7 4.8 4.7"/>',
       visible: function(u){ return !!u && (core.isMainRoot(u) || u.isRoot || hasPerm(u, "manageUsers")); } }
