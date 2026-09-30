@@ -111,25 +111,41 @@ table.ol tr.full td{color:var(--muted)}
 /* Purchase order — A4 on the letterhead */
 .po-wrap{overflow-x:auto}
 body.po-view .wrap{max-width:860px}
-.po-page{background:#fff;color:#2A2519;width:794px;max-width:100%;min-height:1123px;margin:0 auto 18px;padding:48px 56px;display:flex;flex-direction:column;box-shadow:0 6px 30px rgba(0,0,0,.45);font-family:var(--font-b)}
-.po-lh{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#78756E;color:#F3EEDF;border-radius:10px;padding:20px 24px}
-.po-name{font-size:18px;font-weight:600}.po-addr{font-size:11.5px;color:#DCD5C0;margin-top:2px}.po-reg{font-family:var(--font-m);font-size:10px;color:#DCD5C0;margin-top:4px}
+.po-page{background:#fff;color:#2A2519;width:794px;max-width:100%;min-height:1123px;margin:0 auto 18px;padding:34px 44px;display:flex;flex-direction:column;box-shadow:0 6px 30px rgba(0,0,0,.45);font-family:var(--font-b)}
+.po-lh{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#78756E;color:#F3EEDF;border-radius:8px;padding:12px 20px}
+.po-name{font-size:16px;font-weight:600}.po-addr{font-size:11.5px;color:#DCD5C0;margin-top:2px}.po-reg{font-family:var(--font-m);font-size:10px;color:#DCD5C0;margin-top:4px}
 .po-div{align-self:stretch;width:1px;background:rgba(243,238,223,.35)}
-.po-logo{display:flex;flex-direction:column;align-items:flex-end;line-height:1}.po-logo span{font-weight:300;font-size:25px;letter-spacing:.3em}.po-logo small{font-weight:500;font-size:9.5px;letter-spacing:.38em;margin-top:5px}
-.po-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2A2519;padding:18px 0 10px;margin-bottom:12px}
-.po-head h3{font-family:var(--font-m);font-size:30px;text-transform:uppercase;margin:0;letter-spacing:.02em;color:#2A2519}
+.po-logo{display:flex;flex-direction:column;align-items:flex-end;line-height:1}.po-logo span{font-weight:300;font-size:21px;letter-spacing:.3em}.po-logo small{font-weight:500;font-size:9.5px;letter-spacing:.38em;margin-top:5px}
+.po-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2A2519;padding:10px 0 5px;margin-bottom:8px}
+.po-head h3{font-family:var(--font-m);font-size:22px;text-transform:uppercase;margin:0;letter-spacing:.02em;color:#2A2519}
 .po-num{font-family:var(--font-m);font-size:14px;font-weight:600;color:#2A2519;margin-top:2px}
-.po-date{text-align:right;font-size:14px}.po-date span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a7f63}
+.po-date{text-align:right;font-size:14px;line-height:1.1}.po-date span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a7f63}
 .po-rows>div{display:flex;gap:10px;font-size:14px;padding:3px 0;color:#2A2519}.po-rows>div>span:first-child{width:110px;flex-shrink:0;color:#5A5238}
-.po-items{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px;color:#2A2519}
-.po-items th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8060;border-bottom:1px solid #B9AF93;padding:6px 6px}
-.po-items td{border-bottom:1px dotted #C9BFA5;padding:7px 6px;vertical-align:top}.po-items td.n,.po-items th.n{text-align:center;width:50px}.po-items td:first-child{width:28px;color:#8a7f63}
+.po-urgent{background:#B3261E;color:#fff;font-family:var(--font-m);font-weight:600;letter-spacing:.2em;text-align:center;padding:3px;border-radius:3px;margin-bottom:6px;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.po-big{font-family:var(--font-m);font-size:21px;color:#B3261E}
+.po-form{display:grid;grid-template-columns:repeat(3,1fr);gap:3px 16px;color:#2A2519}
+.po-form .pf{display:flex;gap:6px;align-items:baseline;min-width:0}.po-form .pf.w2{grid-column:span 2}
+.po-form .pf>span{flex-shrink:0;font-family:var(--font-m);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:#5A5238;width:58px;white-space:nowrap}
+.po-form .pf>div{flex:1;min-width:0;border-bottom:1px solid #D2C9AF;font-size:12px;padding:1px 2px 2px;min-height:17px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.po-ticks{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:7px;font-size:12px;color:#2A2519}
+.po-ticks .pt{display:flex;align-items:center;gap:5px;font-family:var(--font-m);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.po-ticks .pt i{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1.5px solid #2A2519;font-style:normal;font-weight:700;font-size:11px;line-height:1}
+.po-ticks .pt.urg i{border-color:#B3261E;color:#B3261E}.po-ticks .pt.urg{color:#B3261E}
+.po-ticks .pt-when{font-size:12px;padding-left:6px;border-left:1px solid #D2C9AF}
+.po-ticks .pt-where{margin-left:auto;font-size:11.5px;color:#5A5238}
+.sup .supgrid{display:grid;gap:3px;font-size:13px;margin-top:6px}.ord.sup{cursor:default}.ord.sup.thin{border-left-color:var(--amber)}
+#sf_address{font:inherit;height:64px;min-height:0;resize:vertical}
+.sup a{color:var(--amber)}
+.cardimg{width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;background:#000}
+.po-items{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px;color:#2A2519}
+.po-items th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8060;border-bottom:1px solid #B9AF93;padding:4px 6px}
+.po-items td{border-bottom:1px dotted #C9BFA5;padding:3px 6px;line-height:1.3;vertical-align:top}.po-items td.n,.po-items th.n{text-align:center;width:50px}.po-items td:first-child{width:28px;color:#8a7f63}
 .po-size{color:#8a7f63;font-size:12.5px}
-.po-bottom{margin-top:auto;padding-top:14px}
+.po-bottom{margin-top:auto;padding-top:10px}
 .po-notes{font-size:13px;margin-bottom:8px}.po-quote{font-size:13px;border-top:1px solid #B9AF93;padding-top:10px}
-.po-sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:36px}.po-line{border-top:1px solid #2A2519;height:1px}
+.po-sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:26px}.po-line{border-top:1px solid #2A2519;height:1px}
 .po-lab{font-family:var(--font-m);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#5A5238;margin-top:5px}.po-when{font-family:var(--font-m);font-size:10px;color:#8a7f63;margin-top:2px}
-.po-foot{display:flex;justify-content:space-between;font-family:var(--font-m);font-size:9.5px;color:#8a7f63;margin-top:14px}
+.po-foot{display:flex;justify-content:space-between;font-family:var(--font-m);font-size:9.5px;color:#8a7f63;margin-top:8px}
 .pdf-mode .po-page{width:794px !important;height:1123px !important;min-height:1123px !important;max-width:none !important;margin:0 !important;box-shadow:none !important}
 @page{size:A4;margin:0}
 @media print{
@@ -521,6 +537,7 @@ body.po-view .wrap{max-width:860px}
 })(typeof window !== "undefined" ? window : this);
 
 </script>
+<script src="../suppliers/suppliers-lib.js?v=1"></script>
 <script>
 (function(){
 "use strict";
@@ -541,7 +558,7 @@ function allowed(u){ return core.userHasApp(u, "orders"); }
 
 // ---------- state ----------
 var user = null;
-var D = { board:null, cons:{ items:{}, types:{}, suppliers:{}, meta:{} }, orders:{}, aliases:{}, loaded:false };
+var D = { board:null, cons:{ items:{}, types:{}, suppliers:{}, meta:{} }, orders:{}, aliases:{}, sups:{}, loaded:false };
 var ui = { view:"list", filter:"open", search:"", orderId:null, loc:(function(){ try{ return localStorage.getItem("oakOrdersLoc") || ""; }catch(e){ return ""; } })() };
 function setLoc(l){ ui.loc = l; try{ localStorage.setItem("oakOrdersLoc", l); }catch(e){} }
 // An order belongs to its delivery location; old orders without one show everywhere.
@@ -625,6 +642,7 @@ function matchStock(src, codeUnique){
 }
 
 // ---------- suppliers ----------
+var SUP_FIELDS = ["contact","title","tel","cell","fax","email","cc","address","website","cardUrl","notes"];
 function allSuppliers(){
   var seen = {}, out = [];
   [[D.board && D.board.suppliers, "b"], [D.cons.suppliers, "c"]].forEach(function(p){
@@ -633,6 +651,18 @@ function allSuppliers(){
       seen[key] = { name:s.name.trim(), email:(s.email||"").trim(), cc:(s.ccEmail||"").trim(), contact:s.contactPerson||"" }; out.push(seen[key]); });
   });
   list(D.orders).forEach(function(o){ var key = String(o.supplier||"").trim().toLowerCase(); if(key && !seen[key]){ seen[key] = { name:o.supplier.trim(), email:o.supplierEmail||"", cc:o.supplierCc||"" }; out.push(seen[key]); } });
+  // Contact / tel / fax / address from the latest PO to that supplier
+  list(D.orders).filter(function(o){ return o.po; }).sort(function(a,b){ return num(a.po) - num(b.po); }).forEach(function(o){
+    var t = seen[String(o.supplier||"").trim().toLowerCase()]; if(!t) return;
+    [["supplierContact","contact"],["supplierTel","tel"],["supplierFax","fax"],["supplierAddress","address"]].forEach(function(f){ if(o[f[0]]) t[f[1]] = o[f[0]]; });
+  });
+  // The Suppliers app list wins
+  Object.keys(D.sups || {}).forEach(function(k){ var b = D.sups[k]; if(!b || !b.name) return;
+    var key = b.name.trim().toLowerCase(), t = seen[key];
+    if(!t){ t = seen[key] = { name:b.name.trim() }; out.push(t); }
+    SUP_FIELDS.forEach(function(f){ if(b[f]) t[f] = b[f]; });
+    t.book = k;
+  });
   return out.sort(function(a,b){ return a.name.localeCompare(b.name); });
 }
 
@@ -860,7 +890,7 @@ function viewList(){
       var n = every.filter(function(o){ return isOpen(o) && (l ? o.location === l : true); }).length, late = every.filter(function(o){ return isLate(o) && (l ? o.location === l : true); }).length;
       return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") +
       (user.isRoot ? '<button type="button" id="addLoc" style="font-weight:500;color:var(--muted)">＋ Add location</button>' : '') + '</div>';
-  h += '<div class="row" style="margin-bottom:14px">' + (canQuote() ? '<button class="btn btn-primary" id="newOrder">＋ New order / quote</button>' : '') + (canBoard(user) || canCons(user) ? '<button class="btn" id="rcvAny">📦 Receive a delivery</button>' : '') + (user.isRoot ? '<button class="btn" id="poBookBtn">PO numbers' + (poBook() && poBook().to ? ' (' + poLeft() + ' left)' : '') + '</button>' : '') + '</div>';
+  h += '<div class="row" style="margin-bottom:14px">' + (canQuote() ? '<button class="btn btn-primary" id="newOrder">＋ New order / quote</button>' : '') + (canBoard(user) || canCons(user) ? '<button class="btn" id="rcvAny">📦 Receive a delivery</button>' : '') + (core.userHasApp(user, "suppliers") ? '<a class="btn" href="../suppliers/">🚚 Suppliers</a>' : '') + (user.isRoot ? '<button class="btn" id="poBookBtn">PO numbers' + (poBook() && poBook().to ? ' (' + poLeft() + ' left)' : '') + '</button>' : '') + '</div>';
   h += poBanner();
   // Everyone can see who may approve orders and add quotes (set in Dispatch → Manage users).
   var team = core.getUsers().filter(function(u){ return u && u.username; });
@@ -868,7 +898,7 @@ function viewList(){
   var ap = names("ordersApprove"), qu = names("ordersQuotes");
   h += '<div class="card" style="padding:12px 14px"><div class="small"><b>Can approve orders:</b> ' + (ap.length ? ap.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">✓ ' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
        '<div class="small" style="margin-top:6px"><b>Can add quotes:</b> ' + (qu.length ? qu.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
-       '<div class="small muted" style="margin-top:6px">' + (canApprove() ? 'You can approve orders.' : 'You can\'t approve orders — ask Sean if you need to.') + (isMain() ? ' Change this in Dispatch → Manage users.' : '') + '</div></div>';
+       '<div class="small muted" style="margin-top:6px">' + (canApprove() ? 'You can approve orders.' : 'You can\'t approve orders — ask Sean if you need to.') + (isMain() ? ' Change this in the Users app.' : '') + '</div></div>';
   if(late.length){
     var dow = new Date().getDay();
     h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — overdue deliveries" : dow === 3 ? "Wednesday check — overdue deliveries" : "Overdue deliveries") + '</h2><p class="small muted" style="margin-top:0">Past the delivery date the supplier gave (or ' + LATE_DAYS + '+ days since ordering if no date was given) and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
@@ -897,11 +927,11 @@ function supIn(tt, name){
   var sl = (tt === "board" ? (D.board && D.board.suppliers) : D.cons.suppliers) || {};
   return Object.keys(sl).find(function(k){ return sl[k] && String(sl[k].name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase(); }) || null;
 }
-function isNewSupplier(name){ return !!String(name || "").trim() && !supIn("board", name) && !supIn("consumables", name); }
+function isNewSupplier(name){ return !!String(name || "").trim() && !supIn("board", name) && !supIn("consumables", name) && !OakSuppliers.findByName(D.sups, name); }
 function newSupplierHtml(d){
   if(!isNewSupplier(d.supplier)) return "";
-  var opts = [["board","Board Stock"],["consumables","Consumables"],["both","Both"],["none","Don't add"]];
-  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--amber);border-radius:8px;background:var(--amber-dim)"><div class="small"><b>' + esc(d.supplier) + '</b> is a new supplier. Which app should it be added to?</div>' +
+  var opts = [["board","Board Stock"],["consumables","Consumables"],["both","Both"],["none","Orders only"]];
+  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--amber);border-radius:8px;background:var(--amber-dim)"><div class="small"><b>' + esc(d.supplier) + '</b> is a new supplier — it\'ll be added to the Suppliers list. Which stock app should it show in?</div>' +
     '<div class="seg" style="margin-top:8px">' + opts.map(function(o){ return '<button type="button" data-supto="' + o[0] + '" class="' + (d.newSupTo===o[0]?"on":"") + '">' + o[1] + '</button>'; }).join("") + '</div></div>';
 }
 function supplierField(val, email){
@@ -1189,13 +1219,14 @@ async function saveDraft(){
       if(k) upd[t][fbKey(k)] = { itemId:l.stock.replace(/^[bc]:/, ""), text:String(l.text).slice(0,160) }; });
     for(var t in upd) if(Object.keys(upd[t]).length) await db.ref("stockIn/aliases/" + t).update(upd[t]);
     // a supplier new to Board Stock / Consumables is added to that app's supplier list
-    var added = [], newTo = isNewSupplier(d.supplier) ? d.newSupTo : "";
-    for(var tt of ["board", "consumables"]){
-      var path = tt === "board" ? "boardStock/suppliers" : "consumablesStock/suppliers", hit = supIn(tt, d.supplier);
-      if(!hit && (newTo === tt || newTo === "both")){ await db.ref(path + "/sup" + uid()).set({ name:d.supplier, email:d.supplierEmail || "", addedFrom:"Orders" }); added.push(tt === "board" ? "Board Stock" : "Consumables"); }
-      else if(hit && d.supplierEmail){ var sl = (tt === "board" ? D.board.suppliers : D.cons.suppliers) || {}; if(!sl[hit].email) await db.ref(path + "/" + hit + "/email").set(d.supplierEmail); }
-    }
-    toast((d.status === "quote" ? "Quote" : "Order") + " saved." + (added.length ? " " + d.supplier + " added to " + added.join(" and ") + " suppliers." : ""), "ok");
+    var added = [], newTo = isNewSupplier(d.supplier) ? d.newSupTo : "", apps = {};
+    if(newTo === "board" || newTo === "both"){ apps.board = true; added.push("Board Stock"); }
+    if(newTo === "consumables" || newTo === "both"){ apps.consumables = true; added.push("Consumables"); }
+    try{ var wasNew = !OakSuppliers.findByName(D.sups, d.supplier);
+      if(String(d.supplier || "").trim()) await saveSupplierRec(d.supplier, { email:d.supplierEmail || "", cc:d.supplierCc || "" }, apps);
+      if(wasNew && !added.length && String(d.supplier || "").trim()) added.push("the Suppliers list"); }
+    catch(e){ console.warn("supplier", e); }
+    toast((d.status === "quote" ? "Quote" : "Order") + " saved." + (added.length ? " " + d.supplier + " added to " + added.join(" and ") + " — fill in their details in the Suppliers app." : ""), "ok");
     draft = null; ui.view = "order"; ui.orderId = id;
   }catch(e){ console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
   busy = false; render();
@@ -1311,6 +1342,26 @@ async function setStatus2(o, status, extra){
   try{ await db.ref("orders/list/" + o.id).update(u); toast("Saved.", "ok"); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
 }
 
+// ---------- suppliers (2026-09-30) ----------
+// Suppliers are added and edited only in the Suppliers app (oak-core/suppliers).
+// Orders reads that list, and adds a new supplier off a quote (flagged "new") via OakSuppliers.
+function supCtx(){ return { board:(D.board && D.board.suppliers) || {}, consumables:D.cons.suppliers || {} }; }
+async function saveSupplierRec(name, fill, apps, fromQuote){
+  var m = OakSuppliers.findByName(D.sups, name), id, rec;
+  if(m){
+    id = m.id; rec = Object.assign({}, m); delete rec.id;
+    var any = false; Object.keys(fill).forEach(function(f){ if(fill[f] && !rec[f]){ rec[f] = fill[f]; any = true; } });
+    if(apps) Object.keys(apps).forEach(function(k){ if(apps[k] && !(rec.apps || {})[k]){ rec.apps = Object.assign({}, rec.apps, { [k]:true }); any = true; } });
+    if(!any) return false;
+  } else {
+    id = OakSuppliers.keyFor(name); while(D.sups[id]) id += "_";
+    rec = Object.assign({ name:String(name).trim(), apps:apps || {}, created:new Date().toISOString(), createdBy:user.username, addedFrom:"Orders", needsDetails:true }, fill);
+  }
+  rec.updatedBy = user.username; rec.updatedAt = new Date().toISOString();
+  await db.ref().update(OakSuppliers.saveUpdates(id, rec, supCtx()));
+  return true;
+}
+
 // ---------- purchase orders (2026-09-30) ----------
 // Root loads a block of PO numbers (e.g. 20000–20200). "Approve" on a quote
 // takes the next number, turns the quote into an order and makes a Purchase
@@ -1350,7 +1401,7 @@ function poTabHtml(all){
   if(q) pos = pos.filter(function(o){ return [o.po, o.supplier, o.ref, o.notes].concat(orderLines(o).map(function(l){ return l.desc || l.text || ""; })).join(" ").toLowerCase().indexOf(q) >= 0; });
   if(!pos.length) return '<div class="empty">' + (q ? "No purchase orders match." : "No purchase orders yet. They appear here once a quote is approved.") + '</div>';
   return '<div class="olist">' + pos.map(function(o){
-    return '<div class="ord ' + (o.status === "received" || o.status === "closed" ? "done" : "") + '"><div class="h" data-open="' + esc(o.id) + '" style="cursor:pointer"><b>PO ' + esc(o.po) + ' · ' + esc(o.supplier) + '</b>' + statusPill(o) + '</div>' +
+    return '<div class="ord ' + (o.status === "received" || o.status === "closed" ? "done" : "") + '"><div class="h" data-open="' + esc(o.id) + '" style="cursor:pointer"><b>PO ' + esc(o.po) + ' · ' + esc(o.supplier) + '</b><span>' + (o.urgent ? '<span class="pill late">URGENT</span> ' : '') + (o.collection ? '<span class="pill part">Collection</span> ' : '') + statusPill(o) + '</span></div>' +
       '<div class="small muted" data-open="' + esc(o.id) + '" style="cursor:pointer">' + esc(fmtDate(o.poDate || o.orderedDate)) + (o.location ? ' · 📍 ' + esc(o.location) : '') + (o.ref ? ' · quote ' + esc(o.ref) : '') + ' · ' + orderLines(o).length + ' line(s) · approved by ' + esc(o.approvedBy || "—") + (o.poSentAt ? ' · emailed ' + esc(fmtDate(o.poSentAt.slice(0,10))) : '') + '</div>' +
       '<div class="row" style="margin-top:8px"><button class="btn btn-sm" data-poact="view" data-po="' + esc(o.id) + '">📄 View</button><button class="btn btn-sm" data-poact="print" data-po="' + esc(o.id) + '">🖨 Print</button><button class="btn btn-sm" data-poact="pdf" data-po="' + esc(o.id) + '">⬇ PDF</button><button class="btn btn-sm" data-poact="email" data-po="' + esc(o.id) + '">✉ Email</button><button class="btn btn-sm" data-poact="wa" data-po="' + esc(o.id) + '">WhatsApp</button></div></div>';
   }).join("") + '</div>';
@@ -1359,8 +1410,9 @@ async function whatsappPo(o){
   toast("Making the PDF…", "ok");
   await savePoPdf(o, false);
   var lines = orderLines(o).map(function(l, i){ return (i + 1) + ". " + num(l.qty) + " × " + (l.desc || l.text || stockLabel(l)) + (l.size ? " (" + l.size + ")" : ""); });
-  var text = "*Purchase Order PO " + o.po + "* — Oak Joinery (Pty) Ltd\n" + (o.supplier ? "To: " + o.supplier + "\n" : "") + (o.ref ? "Your quote: " + o.ref + "\n" : "") +
-    "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n" + (o.dueDate ? "Delivery date: " + fmtDate(o.dueDate) + "\n" : "") + "\n" +
+  var text = (o.urgent ? "*URGENT* — " : "") + "*Purchase Order PO " + o.po + "* — Oak Joinery (Pty) Ltd\n" + (o.supplier ? "To: " + o.supplier + (o.supplierContact ? " (" + o.supplierContact + ")" : "") + "\n" : "") + (o.ref ? "Your quote: " + o.ref + "\n" : "") + (o.jobNo ? "Job no.: " + o.jobNo + "\n" : "") +
+    (o.collection ? "Collection: Oak Joinery will collect\n" : "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n") +
+    (o.asap ? "Date: ASAP\n" : o.dueDate ? (o.collection ? "Collection" : "Delivery") + " date: " + fmtDate(o.dueDate) + "\n" : "") + "\n" +
     lines.slice(0, 30).join("\n") + (lines.length > 30 ? "\n… and " + (lines.length - 30) + " more" : "") + (o.poUrl ? "\n\nPO (PDF): " + o.poUrl : "") + "\n\nPlease quote PO " + o.po + " on your delivery note and invoice.";
   window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
 }
@@ -1407,6 +1459,46 @@ async function takePoNumber(){
   if(!res.committed || got === null) throw new Error("No PO numbers left — " + (user.isRoot ? "load the next block under “PO numbers”." : "ask Sean to load more PO numbers."));
   return got;
 }
+// Fields from the paper PO form (supplier contact, tel, fax, address, job no, dates) + Collection / Urgent ticks.
+function poFieldsHtml(o, sup){
+  var v = function(f, alt){ return esc(o[f] || (sup && sup[alt]) || ""); };
+  return '<div class="grid2"><div><label>Contact person</label><input id="pfContact" value="' + v("supplierContact", "contact") + '" placeholder="e.g. Lindani"></div>' +
+    '<div><label>Tel</label><input id="pfTel" type="tel" value="' + esc(o.supplierTel || sup.tel || sup.cell || "") + '" placeholder="011 …"></div>' +
+    '<div><label>Fax</label><input id="pfFax" value="' + v("supplierFax", "fax") + '"></div>' +
+    '<div><label>Sales order / job no.</label><input id="pfJob" value="' + esc(o.jobNo || "") + '" placeholder="e.g. Consumable stock"></div></div>' +
+    '<label>Supplier address</label><input id="pfAddr" value="' + v("supplierAddress", "address") + '" placeholder="Street, area, city">' +
+    '<div class="grid2"><div><label>Delivery / collection date</label><input id="aDue" type="date" value="' + esc(o.dueDate || "") + '"></div>' +
+    '<div style="display:flex;align-items:flex-end"><label class="tick" style="margin:0 0 10px"><input type="checkbox" id="pfAsap"' + (o.asap ? " checked" : "") + '> <span>ASAP</span></label></div></div>' +
+    '<div class="row" style="gap:18px;margin:12px 0 4px">' +
+      '<label class="tick"><input type="checkbox" id="pfColl"' + (o.collection ? " checked" : "") + '> <span>🚚 Collection <span class="small muted">(we collect)</span></span></label>' +
+      '<label class="tick"><input type="checkbox" id="pfUrg"' + (o.urgent ? " checked" : "") + '> <span style="color:#E39A80;font-weight:600">⚠ Urgent</span></label></div>' +
+    '<label>Send to (supplier email)</label><input id="aTo" type="email" value="' + esc(o.supplierEmail || sup.email || "") + '" placeholder="sales@supplier.co.za">' +
+    '<label>CC (second email)</label><input id="aCc" type="text" value="' + esc(o.supplierCc || sup.cc || "") + '" placeholder="e.g. accounts@supplier.co.za or someone at Oak">';
+}
+function readPoFields(o){
+  var g = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
+  var c = function(id){ var e = document.getElementById(id); return !!(e && e.checked); };
+  return { supplierContact:g("pfContact"), supplierTel:g("pfTel"), supplierFax:g("pfFax"), supplierAddress:g("pfAddr"), jobNo:g("pfJob"),
+    asap:c("pfAsap"), collection:c("pfColl"), urgent:c("pfUrg"),
+    supplierEmail:g("aTo"), supplierCc:g("aCc"), dueDate:g("aDue") || null };
+}
+async function learnSupplier(name, upd){
+  try{ await saveSupplierRec(name, { contact:upd.supplierContact, tel:upd.supplierTel, fax:upd.supplierFax, address:upd.supplierAddress, email:upd.supplierEmail, cc:upd.supplierCc }); }
+  catch(e){ console.warn("learnSupplier", e); }
+}
+function editPoModal(o){
+  if(!canApprove()){ toast("Only people allowed to approve orders can change a PO.", "err"); return; }
+  var sup = allSuppliers().find(function(s){ return s.name.toLowerCase() === String(o.supplier||"").toLowerCase(); }) || {};
+  openModal('<h2>PO ' + esc(o.po) + ' details</h2><p class="small muted" style="margin-top:0">' + esc(o.supplier) + '</p>' + poFieldsHtml(o, sup) +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    if(!freshUser()) return;
+    var upd = readPoFields(o);
+    try{ await db.ref("orders/list/" + o.id).update(upd); Object.assign(D.orders[o.id], upd); learnSupplier(o.supplier, upd); closeModal(); toast("PO details saved.", "ok"); render(); }
+    catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
 function approveModal(o){
   if(!canApprove()){ toast("Only people the main root has allowed can approve orders. Ask Sean.", "err"); return; }
   var left = poLeft(), b = poBook();
@@ -1415,10 +1507,8 @@ function approveModal(o){
   openModal('<h2>' + (o.status === "quote" ? "Approve quote" : "Create purchase order") + '</h2>' +
     '<p class="small muted" style="margin-top:0">' + esc(o.supplier) + (o.ref ? ' · quote ' + esc(o.ref) : '') + ' · ' + orderLines(o).length + ' line(s)</p>' +
     '<div class="check" style="margin:8px 0"><div class="small muted">PO number</div><div style="font-family:var(--font-m);font-size:26px;font-weight:600">' + esc(b.next) + '</div><div class="small muted">' + left + ' number' + (left===1?'':'s') + ' left in this block</div></div>' +
-    '<div class="grid2">' + (o.status === "quote" ? '<div><label>Order date</label><input id="aDate" type="date" value="' + today() + '"></div>' : '') +
-    '<div><label>Delivery date (optional)</label><input id="aDue" type="date" value="' + esc(o.dueDate || "") + '"></div></div>' +
-    '<label>Send to (supplier email)</label><input id="aTo" type="email" value="' + esc(o.supplierEmail || sup.email || "") + '" placeholder="sales@supplier.co.za">' +
-    '<label>CC (second email)</label><input id="aCc" type="text" value="' + esc(o.supplierCc || sup.cc || "") + '" placeholder="e.g. accounts@supplier.co.za or someone at Oak">' +
+    (o.status === "quote" ? '<label>Order date</label><input id="aDate" type="date" value="' + today() + '">' : '') +
+    poFieldsHtml(o, sup) +
     '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">✓ Approve &amp; create PO</button></div>');
   document.getElementById("mCancel").onclick = closeModal;
   document.getElementById("mOk").onclick = async function(){
@@ -1426,39 +1516,50 @@ function approveModal(o){
     var btn = this; btn.disabled = true;
     try{
       var po = await takePoNumber();
-      var upd = { po:po, poDate:today(), approvedBy:user.username, approvedAt:new Date().toISOString(),
-        supplierEmail: document.getElementById("aTo").value.trim(), supplierCc: document.getElementById("aCc").value.trim(),
-        dueDate: document.getElementById("aDue").value || o.dueDate || null };
+      var upd = Object.assign({ po:po, poDate:today(), approvedBy:user.username, approvedAt:new Date().toISOString() }, readPoFields(o));
+      if(!upd.dueDate) upd.dueDate = o.dueDate || null;
       if(o.status === "quote"){ upd.status = "ordered"; upd.orderedDate = (document.getElementById("aDate") || {}).value || today(); }
       await db.ref("orders/list/" + o.id).update(upd);
-      Object.assign(D.orders[o.id], upd);
+      Object.assign(D.orders[o.id], upd); learnSupplier(o.supplier, upd);
       closeModal(); toast("Approved — PO " + po + " created.", "ok");
       ui.view = "po"; ui.orderId = o.id; render(); window.scrollTo(0, 0);
     }catch(e){ btn.disabled = false; toast(e.message || String(e), "err"); }
   };
 }
 function poDocHtml(o){
-  var lines = orderLines(o), PER = 16, pages = [];
-  for(var i = 0; i < Math.max(lines.length, 1); i += PER) pages.push(lines.slice(i, i + PER));
+  var lines = orderLines(o), PER = o.urgent ? 25 : 26, pages = [];
+  // long descriptions take two rows, so fill each page by rows used, not by line count
+  var cur = [], used = 0;
+  lines.forEach(function(l){ var t = String(l.desc || l.text || "") + (l.size ? " " + l.size : "") + (l.code ? " (" + l.code + ")" : ""), w = t.length > 72 ? 2 : 1;
+    if(used + w > PER && cur.length){ pages.push(cur); cur = []; used = 0; } cur.push(l); used += w; });
+  if(cur.length || !pages.length) pages.push(cur);
+  var startIdx = []; pages.reduce(function(a, pl, i){ startIdx[i] = a; return a + pl.length; }, 0);
+  var pf = function(lab, val, wide){ return '<div class="pf' + (wide ? ' w' + wide : '') + '"><span>' + lab + '</span><div>' + (val || '&nbsp;') + '</div></div>'; };
   var head = function(){ return '<div class="po-lh"><div><div class="po-name">Oak Joinery (Pty) Ltd</div><div class="po-addr">16 Bowling Avenue, Kramerville, Johannesburg</div><div class="po-reg">VAT No: 4390291278<br>Reg No: 2022/532088/07</div></div><div class="po-div"></div><div class="po-logo"><span>OAK</span><small>JOINERY</small></div></div>' +
-    '<div class="po-head"><div><h3>Purchase order</h3><div class="po-num">PO ' + esc(o.po) + '</div></div><div class="po-date"><span>Date</span><b>' + esc(fmtDate(o.poDate || o.orderedDate || today())) + '</b></div></div>' +
-    '<div class="po-rows"><div><span>To:</span><b>' + esc(o.supplier) + '</b></div>' + (o.supplierEmail ? '<div><span></span><span>' + esc(o.supplierEmail) + '</span></div>' : '') +
-    (o.ref ? '<div><span>Your quote:</span><span>' + esc(o.ref) + '</span></div>' : '') +
-    '<div><span>Deliver to:</span><span>Oak Joinery — ' + esc(o.location || "") + (addrFor(o.location) ? ', ' + esc(addrFor(o.location)) : '') + '</span></div>' +
-    (o.dueDate ? '<div><span>Delivery date:</span><span>' + esc(fmtDate(o.dueDate)) + '</span></div>' : '') + '</div>'; };
-  var foot = function(n){ return '<div class="po-bottom">' + (o.notes ? '<div class="po-notes"><b>Notes:</b> ' + esc(o.notes) + '</div>' : '') +
+    '<div class="po-head"><div><h3>Purchase order</h3></div><div class="po-date"><span>PO No.</span><b class="po-big">' + esc(o.po) + '</b></div></div>' +
+    (o.urgent ? '<div class="po-urgent">⚠ URGENT ORDER</div>' : '') +
+    '<div class="po-form">' +
+      pf("Supplier", '<b>' + esc(o.supplier) + '</b>', 2) + pf("Order date", esc(fmtDate(o.poDate || o.orderedDate || today()))) +
+      pf("Contact", esc(o.supplierContact || "")) + pf("Tel", esc(o.supplierTel || "")) + pf("Fax", esc(o.supplierFax || "")) +
+      pf("Email", esc(o.supplierEmail || ""), 2) + pf("Quote", esc(o.ref || "")) +
+      pf("Address", esc(o.supplierAddress || ""), 2) + pf("Job no.", esc(o.jobNo || "")) +
+    '</div>' +
+    '<div class="po-ticks"><span class="pt"><i>' + (o.collection ? "✓" : "") + '</i>Collection</span><span class="pt"><i>' + (!o.collection ? "✓" : "") + '</i>Delivery</span><span class="pt urg"><i>' + (o.urgent ? "✓" : "") + '</i>Urgent</span>' +
+      ((o.asap || o.dueDate) ? '<span class="pt-when">' + (o.collection ? "Collect" : "Deliver") + ' by: <b>' + (o.asap ? 'ASAP' : esc(fmtDate(o.dueDate))) + '</b>' + (o.asap && o.dueDate ? ' <span class="po-size">(latest ' + esc(fmtDate(o.dueDate)) + ')</span>' : '') + '</span>' : '') +
+      '<span class="pt-where">' + (o.collection ? 'Oak Joinery will collect' : 'Deliver to: Oak Joinery — ' + esc(o.location || "") + (addrFor(o.location) ? ', ' + esc(addrFor(o.location)) : '')) + '</span></div>'; };
+  var foot = function(n){ return '<div class="po-bottom">' +
     '<div class="po-quote">Please quote <b>PO ' + esc(o.po) + '</b> on your delivery note and invoice.</div>' +
     '<div class="po-sign"><div><div class="po-line"></div><div class="po-lab">Authorised by: <b>' + esc(o.approvedBy || user.username) + '</b></div><div class="po-when">' + esc(fmtDate(o.poDate || today())) + '</div></div><div></div></div>' +
     '<div class="po-foot"><span>PO ' + esc(o.po) + '</span><span>Page ' + n + ' of ' + pages.length + '</span></div></div>'; };
   return '<div id="poDoc">' + pages.map(function(pl, pi){
     return '<div class="po-page">' + head() + '<table class="po-items"><thead><tr><th>#</th><th class="n">Qty</th><th>Unit</th><th>Description</th></tr></thead><tbody>' +
-      pl.map(function(l, k){ var idx = pi * PER + k + 1; var unit = unitOf(l) || ""; if(/^Not /.test(unit)) unit = "";
+      pl.map(function(l, k){ var idx = startIdx[pi] + k + 1; var unit = unitOf(l) || ""; if(/^Not /.test(unit)) unit = "";
         return '<tr><td>' + idx + '</td><td class="n"><b>' + num(l.qty) + '</b></td><td>' + esc(unit.replace(/ \(single\)/, "")) + '</td><td>' + esc(l.desc || l.text || stockLabel(l)) + (l.size ? ' <span class="po-size">' + esc(l.size) + '</span>' : '') + (l.code ? ' <span class="po-size">(' + esc(l.code) + ')</span>' : '') + '</td></tr>'; }).join("") +
       '</tbody></table>' + foot(pi + 1) + '</div>'; }).join("") + '</div>';
 }
 function viewPo(o){
   return '<button class="backlink" id="back">' + (ui.poFrom === "list" ? '← All purchase orders' : '← Back to the order') + '</button>' +
-    '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="poEmail">✉ Email to supplier</button><button class="btn" id="poPrint">🖨 Print</button><button class="btn" id="poPdf">⬇ Save PDF</button><button class="btn" id="poWa">WhatsApp</button></div>' +
+    '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="poEmail">✉ Email to supplier</button><button class="btn" id="poPrint">🖨 Print</button><button class="btn" id="poPdf">⬇ Save PDF</button><button class="btn" id="poWa">WhatsApp</button>' + (canApprove() ? '<button class="btn" id="poEdit">✎ Edit PO details</button>' : '') + '</div>' +
     '<p class="small muted" style="margin:-4px 0 12px">To: <b>' + esc(o.supplierEmail || "no email saved") + '</b>' + (o.supplierCc ? ' · CC: <b>' + esc(o.supplierCc) + '</b>' : '') + (o.poSentAt ? ' · last emailed ' + esc(new Date(o.poSentAt).toLocaleString("en-ZA")) : '') + '</p>' +
     '<div class="po-wrap">' + poDocHtml(o) + '</div>';
 }
@@ -1495,12 +1596,13 @@ async function emailPo(o){
   var sup = allSuppliers().find(function(s){ return s.name.toLowerCase() === String(o.supplier||"").toLowerCase(); }) || {};
   var body = "Good day" + (sup.contact ? " " + sup.contact : "") + ",\n\nPlease find attached our purchase order PO " + o.po + (o.ref ? " for your quote " + o.ref : "") + ".\n\n" +
     lines.slice(0, 25).join("\n") + (lines.length > 25 ? "\n… and " + (lines.length - 25) + " more (see the PO)" : "") + "\n\n" +
-    "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n" +
-    (o.dueDate ? "Delivery date: " + fmtDate(o.dueDate) + "\n" : "") +
+    (o.urgent ? "*** URGENT ***\n" : "") + (o.jobNo ? "Sales order / job no.: " + o.jobNo + "\n" : "") +
+    (o.collection ? "Collection: Oak Joinery will collect.\n" : "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n") +
+    (o.asap ? (o.collection ? "Collection" : "Delivery") + " date: ASAP\n" : o.dueDate ? (o.collection ? "Collection" : "Delivery") + " date: " + fmtDate(o.dueDate) + "\n" : "") +
     (o.poUrl ? "\nPO (PDF): " + o.poUrl + "\n" : "") +
     "\nPlease quote PO " + o.po + " on your delivery note and invoice.\n\nKind regards,\n" + user.username + "\nOak Joinery (Pty) Ltd";
   var href = "mailto:" + encodeURIComponent(o.supplierEmail).replace(/%40/g, "@") + "?" + (o.supplierCc ? "cc=" + encodeURIComponent(o.supplierCc).replace(/%40/g, "@").replace(/%2C/gi, ",") + "&" : "") +
-    "subject=" + encodeURIComponent("Purchase Order PO " + o.po + " — Oak Joinery") + "&body=" + encodeURIComponent(body);
+    "subject=" + encodeURIComponent((o.urgent ? "URGENT — " : "") + "Purchase Order PO " + o.po + " — Oak Joinery") + "&body=" + encodeURIComponent(body);
   await db.ref("orders/list/" + o.id).update({ poSentAt:new Date().toISOString(), poSentBy:user.username });
   window.location.href = href;
   toast("Email opened — attach " + name + " from your Downloads if it isn't attached.", "ok");
@@ -1565,6 +1667,7 @@ function bind(){
   if(ui.view === "po" && D.orders[ui.orderId]){
     var po = D.orders[ui.orderId]; po.id = ui.orderId;
     if(q("#back")) q("#back").onclick = function(){ ui.view = ui.poFrom === "list" ? "list" : "order"; ui.poFrom = null; render(); };
+    if(q("#poEdit")) q("#poEdit").onclick = function(){ editPoModal(po); };
     if(q("#poWa")) q("#poWa").onclick = async function(){ this.disabled = true; try{ await whatsappPo(po); }catch(e){ toast("Couldn't prepare WhatsApp: " + (e.message || e), "err"); } this.disabled = false; };
     var act = ui.poAction; ui.poAction = null;
     if(act === "print") setTimeout(function(){ window.print(); }, 300);
@@ -1654,6 +1757,7 @@ function start(){
     db.ref("consumablesStock/" + k).on("value", function(s){ D.cons[{ screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]] = s.val() || {}; rr(); });
   });
   db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
+  db.ref("suppliers/list").on("value", function(s){ D.sups = s.val() || {}; if(ui.view === "list") rr(); });
   db.ref("orders/poBook").on("value", function(s){ D.poBook = s.val() || null; if(ui.view === "list" || ui.view === "order") rr(); });
   db.ref("orders/list").on("value", function(s){ D.orders = s.val() || {}; D.loaded = true;
     // don't redraw under someone typing in a form
