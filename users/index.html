@@ -167,7 +167,8 @@ var LABELS = {
   boardAddBoard:"Add Boards", boardAddQty:"Add Stock", boardRemoveQty:"Remove Stock", boardSendToDispatch:"Send to Dispatch", boardExportData:"Print / share stock PDF", boardViewLog:"Activity Log", boardSettings:"App Settings",
   consManageItems:"Add/edit items & reorder levels", consHandOut:"Hand out items", consManageConsumables:"Update container fill levels / liquid volumes", consViewReports:"View reports", consExportExcel:"Export to Excel", consSendToDispatch:"Send to Dispatch",
   ordersQuotes:"Add / upload quotes", ordersApprove:"Approve quotes & send purchase orders",
-  manageUsers:"Manage users (open this Users app)"
+  manageUsers:"Manage users (open this Users app)",
+  suppliersEdit:"Add / edit / delete suppliers (and scan business cards)"
 };
 var MAIN_ONLY = ["ordersQuotes", "ordersApprove", "manageUsers"];
 var GROUPS = [
@@ -177,6 +178,7 @@ var GROUPS = [
   { app:"consumables", title:"Consumables", keys:["consManageItems","consHandOut","consManageConsumables","consViewReports","consExportExcel","consSendToDispatch"] },
   { app:"orders", title:"Orders", note:"receiving deliveries uses the Add Stock ticks in Board Stock / Consumables", keys:["ordersQuotes","ordersApprove"] },
   { app:"stockIn", title:"Stock In", note:"adds to whichever of Board Stock / Consumables / Stock List they have Add Stock for", keys:[] },
+  { app:"suppliers", title:"Suppliers", note:"the one supplier list used by Board Stock, Consumables, Orders and Stock In", keys:["suppliersEdit"] },
   { app:"tools", title:"Tools", note:"sign tools out and in; only root adds, edits or removes tools", keys:[] },
   { app:null, title:"Users", note:"this app", keys:["manageUsers"] }
 ];
