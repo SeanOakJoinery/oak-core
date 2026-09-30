@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E1C18">
+<meta name="description" content="Oak Joinery Suppliers — one list of suppliers with contacts, phone numbers and addresses, used by every app.">
+<title>Suppliers</title>
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="../manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{--bg:#1E1C18;--panel:#26221C;--panel-2:#2E2A22;--text:#EFE8D8;--muted:#9C9280;--amber:#E3A23A;--amber-dim:#3B2E1A;--line:#433D32;--green:#5FA76E;--green-dim:#1F3325;--rust:#C46A4A;--rust-dim:#3A231B;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;--font-m:"Space Grotesk","Inter",system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.wrap{max-width:760px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand .t{font-family:var(--font-m);font-weight:600;font-size:18px}
+.brand .s{font-size:12px;color:var(--muted)}
+h2{font-family:var(--font-m);font-weight:600;font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--amber-dim);color:var(--amber);font-size:12px;font-weight:600;margin-right:8px;vertical-align:1px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px 10px;font:inherit;font-weight:600;cursor:pointer}
+.seg button.on{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 11px;font:inherit;font-size:15px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;padding:11px 14px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);text-decoration:none}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1E1C18}
+.btn-sm{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--amber);background:var(--amber-dim)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{color:var(--amber);border-color:var(--amber)}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+.bar{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--amber);width:0;transition:width .2s}
+.lines{display:grid;gap:10px}
+.line{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px}
+.line.ok{border-left-color:var(--green)}
+.line.check{border-left-color:var(--amber)}
+.line.new{border-left-color:#6FA0C8}
+.line.skip{opacity:.55}
+.line .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-word;margin-bottom:6px}
+.line .lrow{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:center}
+.line .unit{font-size:12px;color:var(--muted)}
+.line .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+.line .newf{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.line .newf label{margin:0 0 3px}
+.tag{font-size:11px;border-radius:99px;padding:2px 8px;margin-left:6px}
+.tag.ok{background:var(--green-dim);color:var(--green)}.tag.check{background:var(--amber-dim);color:var(--amber)}.tag.new{background:#1C2A36;color:#8FB9DB}
+.sum{position:fixed;left:0;right:0;bottom:0;background:rgba(30,28,24,.96);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));backdrop-filter:blur(6px)}
+.sum .in{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{border-top:1px solid var(--line);padding:9px 0;font-size:13px}
+.hist li:first-child{border-top:none}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;z-index:50}
+.toast.show{opacity:1}.toast.err{border-color:var(--rust)}.toast.ok{border-color:var(--green)}
+.empty{padding:14px;text-align:center;color:var(--muted);font-size:13px}
+.hide{display:none!important}
+
+.slist{display:grid;gap:10px}
+.sup{background:var(--panel-2);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:8px;padding:12px}
+.sup.thin{border-left-color:var(--amber)}
+.sup .h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.sup .h b{font-size:16px}
+.sup .g{display:grid;gap:4px;font-size:14px;margin-top:8px}
+.sup a{color:var(--amber);text-decoration:none}
+.sup .apps{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:11px;border-radius:99px;padding:2px 8px;white-space:nowrap;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+.pill.on{background:var(--green-dim);color:var(--green);border-color:transparent}
+.pill.warn{background:var(--amber-dim);color:var(--amber);border-color:transparent}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+.tick{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--text);margin:8px 0}.tick input{width:20px;height:20px;accent-color:var(--amber)}
+.check{border:1px solid var(--amber);background:var(--amber-dim);border-radius:10px;padding:12px}
+.cardimg{width:100%;max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;background:#000}
+#sf_address{font:inherit;height:64px;min-height:0;resize:vertical}
+.prog{height:5px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:var(--green)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.stats div{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}.stats b{display:block;font-size:20px}.stats span{font-size:12px;color:var(--muted)}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="../icon-192.png" alt=""><div><div class="t">Suppliers</div><div class="s" id="who">Oak Joinery</div></div></div>
+    <a class="btn btn-sm" href="../">☰ Menu</a>
+  </header>
+  <main id="app"><div class="card muted">Loading…</div></main>
+</div>
+<div id="modal" class="hide"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="../oak-core.js?v=3"></script>
+<script src="suppliers-lib.js?v=1"></script>
+<script>
+(function(){
+"use strict";
+var S = OakCore.session, esc = OakCore.esc, SL = OakSuppliers;
+var core = OakCore.createApp({ appId: "suppliers", readOnly: true });
+var db = null, user = null, busy = false, statusMsg = "", progress = 0;
+var D = { master:{}, board:{}, boards:[], cons:{}, consItems:{}, consTypes:{}, book:{}, orders:{}, got:{} };
+var ui = { filter:"all", search:"" };
+
+function toast(msg, kind){ var t = document.getElementById("toast"); t.textContent = msg; t.className = "toast show " + (kind||""); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.className = "toast"; }, 3400); }
+function isMain(){ return !!(user && core.isMainRoot(user)); }
+function canEdit(){ return isMain() || !!(user && (user.isRoot || (user.permissions && user.permissions.suppliersEdit))); }
+function freshUser(){ var f = S.resolve(core.getUsers()); if(f.status !== "ok"){ S.goHome({ next:"suppliers" }); return null; } user = f.user; return user; }
+function ctx(){ return { board:D.board, consumables:D.cons }; }
+function sups(){ return SL.list(D.master).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }); }
+function allSuppliers(){ return sups(); }
+function telLink(n){ return '<a href="tel:' + esc(String(n).replace(/[^\d+]/g, "")) + '">' + esc(n) + '</a>'; }
+function low(s){ return SL.low(s); }
+
+// What uses each supplier in the other apps
+function usage(s){
+  var bid = (s.links || {}).board, cid = (s.links || {}).consumables;
+  var boards = (Array.isArray(D.boards) ? D.boards : SL.list(D.boards)).filter(function(b){ return b && bid && b.supplierId === bid; }).length;
+  var cons = [D.consItems, D.consTypes].reduce(function(n, src){ return n + Object.keys(src || {}).filter(function(k){ return src[k] && cid && src[k].supplierId === cid; }).length; }, 0);
+  var open = SL.list(D.orders).filter(function(o){ return low(o.supplier) === low(s.name) && o.status !== "received" && o.status !== "closed"; }).length;
+  return { boards:boards, cons:cons, orders:open };
+}
+
+// ---------- modal ----------
+function openModal(html){ var m = document.getElementById("modal"); m.innerHTML = '<div class="mbg"><div class="mbox">' + html + '</div></div>'; m.classList.remove("hide"); }
+function closeModal(){ var m = document.getElementById("modal"); m.innerHTML = ""; m.classList.add("hide"); if(render.pending){ render.pending = false; render(); } }
+function setStatus(msg, pct){ statusMsg = msg; if(pct !== undefined) progress = pct; var s = document.getElementById("status"); if(s) s.textContent = msg; var b = document.getElementById("barI"); if(b) b.style.width = Math.round((progress||0)*100) + "%"; }
+function loadScript(src){ return new Promise(function(res, rej){ var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function(){ rej(new Error("Could not load " + src)); }; document.head.appendChild(s); }); }
+async function pdfLib(){
+  if(!window.pdfjsLib){ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"); }
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return window.pdfjsLib;
+}
+
+var ocrWorker = null;
+async function ocr(canvasOrImg, label){
+  if(!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  if(!ocrWorker){
+    setStatus("Getting the text reader ready (first time only)…", 0.05);
+    ocrWorker = await Tesseract.createWorker("eng", 1, {
+      langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+      logger: function(m){ if(m.status === "recognizing text") setStatus("Reading " + label + "… " + Math.round(m.progress*100) + "%", m.progress); }
+    });
+    await ocrWorker.setParameters({ preserve_interword_spaces: "1" });
+  }
+  var r = await ocrWorker.recognize(canvasOrImg);
+  return r.data.text || "";
+}
+function imageToCanvas(file){
+  return new Promise(function(res, rej){
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function(){
+      var max = 2200, sc = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement("canvas"); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      var g = c.getContext("2d"); g.filter = "grayscale(1) contrast(1.25)"; g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("That picture couldn't be opened.")); };
+    img.src = url;
+  });
+}
+
+var SUP_STOP = { pty:1, ltd:1, limited:1, cc:1, the:1, and:1, sa:1, south:1, africa:1, co:1, company:1, inc:1, ta:1, of:1, group:1, holdings:1, trading:0 };
+function plain(t){ return " " + String(t || "").toLowerCase().replace(/[^a-z0-9@.]+/g, " ").replace(/\s+/g, " ") + " "; }
+function supKeys(name){ return plain(name).trim().split(" ").filter(function(w){ return w.length >= 3 && !SUP_STOP[w] && !/^\d+$/.test(w); }); }
+function isUs(t){ return /oak\s*joinery/i.test(t || ""); }
+// Best known supplier named in the text (by email domain or by the words of its name).
+function detectSupplier(text, cands){
+  var T = plain(text), best = null, bs = 0;
+  (cands || []).forEach(function(c){
+    if(!c || !c.name || isUs(c.name)) return;
+    var sc = 0, dom = String(c.email || "").toLowerCase().split("@")[1];
+    if(dom && dom.length > 4 && T.indexOf(dom) >= 0) sc = 1;
+    else {
+      var k = supKeys(c.name); if(!k.length) return;
+      var hits = k.filter(function(w){ return T.indexOf(" " + w + " ") >= 0; }).length;
+      if(hits === k.length) sc = 0.9 + Math.min(k.length, 5) / 100;
+      else if(hits >= 2 && hits / k.length >= 0.6) sc = 0.6 + hits / 100;
+    }
+    if(sc > bs){ bs = sc; best = c; }
+  });
+  return bs >= 0.6 ? best : null;
+}
+
+function guessSupplierName(text){
+  var lines = String(text || "").split(/\n/).slice(0, 25);
+  for(var i = 0; i < lines.length; i++){
+    var ln = lines[i].replace(/\s{2,}.*$/, "").trim();
+    if(!ln || isUs(ln)) continue;
+    var m = ln.match(/^(.{2,60}?\b(?:\(pty\)\s*ltd|pty\s*ltd|\(pty\)|limited|ltd|cc))\b/i);
+    if(m && !/\b(bank|account|reg|vat|invoice|quot)/i.test(m[1])) return m[1].replace(/\s+/g, " ").trim();
+  }
+  return "";
+}
+
+// Read a business card photo and pull out the company, name, numbers, email and address.
+function parseCard(text){
+  var lines = [].concat.apply([], String(text || "").split(/\n/).map(function(l){ return l.split(/\s{3,}/); })).map(function(l){ return l.replace(/[|©®™•·]+/g, " ").replace(/\s+/g, " ").trim(); }).filter(function(l){ return l.length > 1; });
+  var r = { tel:"", cell:"", fax:"", email:"", website:"", contact:"", title:"", address:"", name:"" };
+  var em = String(text).match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || [];
+  r.email = em.find(function(e){ return !isUs(e); }) || "";
+  var web = String(text).match(/\b(?:https?:\/\/)?(www\.[\w-]+(?:\.[\w-]+)+)/i); if(web) r.website = web[1].toLowerCase();
+  var used = {};
+  lines.forEach(function(l, i){
+    var nums = l.match(/(?:\+\s?27|\(?0)\s?\(?\d{2}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g) || [];
+    nums.forEach(function(n){
+      var before = l.slice(0, l.indexOf(n)).toLowerCase(), clean = n.replace(/[^\d+]/g, "").replace(/^\+27/, "0");
+      var nice = clean.replace(/^(\d{3})(\d{3})(\d{4})$/, "$1 $2 $3");
+      var kind = /fax|\bf\b|f:/.test(before) ? "fax" : /cell|mob|\bc\b|\bm\b|c:|m:/.test(before) ? "cell" : /tel|\bt\b|t:|ph|office/.test(before) ? "tel" : (/^0[6-8]/.test(clean) ? "cell" : "tel");
+      if(!r[kind]) r[kind] = nice; else if(!r.tel) r.tel = nice;
+      used[i] = 1;
+    });
+    if(r.email && l.indexOf(r.email) >= 0) used[i] = 1;
+    if(r.website && l.toLowerCase().indexOf(r.website) >= 0) used[i] = 1;
+  });
+  // company: a known supplier, else "(Pty) Ltd"-style name, else the email domain
+  var known = detectSupplier(text, allSuppliers());
+  r.name = known ? known.name : guessSupplierName(text);
+  if(!r.name){ var co = lines.find(function(l){ return /\b(edging|timbers?|boards?|hardware|supplies|suppliers|trading|industries|glass|steel|paints?|fixings|distributors?|group|enterprises)\b/i.test(l) && !/@|www/i.test(l); }); if(co) r.name = co; }
+  if(!r.name && r.email){ var d = r.email.split("@")[1].split(".")[0]; if(!/gmail|yahoo|outlook|hotmail|mweb|telkomsa|webmail/i.test(d)) r.name = d.charAt(0).toUpperCase() + d.slice(1); }
+  // address: lines with a street word or a 4-digit postal code
+  var addr = [];
+  lines.forEach(function(l, i){
+    if(used[i]) return;
+    if(/\b(street|str|st|road|rd|avenue|ave|drive|dr|lane|way|crescent|cres|park|industrial|ind\.?|unit|erf|p\.?o\.? box|close|corner|cnr)\b/i.test(l) || (/\b\d{4}\b/.test(l) && /[a-z]{3}/i.test(l) && addr.length)){ addr.push(l.replace(/^(address|adr|a)\s*[:.-]\s*/i, "")); used[i] = 1; }
+  });
+  r.address = addr.slice(0, 3).join(", ");
+  // person + job title
+  var TITLE = /\b(manager|sales|director|rep(resentative)?|consultant|owner|accounts?|buyer|estimator|admin(istrator)?|ceo|md|coordinator|executive|branch|specialist|assistant|supervisor)\b/i;
+  for(var i = 0; i < lines.length; i++){
+    var l = lines[i];
+    if(used[i] || (r.name && l.toLowerCase().indexOf(r.name.toLowerCase()) >= 0) || /\d|@|www|\(pty\)|ltd/i.test(l) || TITLE.test(l)) continue;
+    var w = l.split(" ");
+    if(w.length >= 2 && w.length <= 4 && w.every(function(x){ return /^[A-Z][a-zA-Z'’-]+$/.test(x) || /^[A-Z]{2,}$/.test(x); })){
+      r.contact = w.map(function(x){ return x.charAt(0) + x.slice(1).toLowerCase(); }).join(" ");
+      var nx = lines[i + 1] || "", pv = lines[i - 1] || "";
+      r.title = TITLE.test(nx) && !/\d|@/.test(nx) ? nx : TITLE.test(pv) && !/\d|@/.test(pv) ? pv : "";
+      break;
+    }
+  }
+  // more address lines: the town / city and the postal code
+  var skip = [r.contact, r.title, r.name].filter(Boolean).map(function(x){ return x.toLowerCase(); });
+  lines.forEach(function(l, i){
+    if(used[i] || /@|www/i.test(l) || skip.indexOf(l.toLowerCase()) >= 0 || (r.name && l.toLowerCase().indexOf(r.name.toLowerCase()) >= 0)) return;
+    if(/^\d{4}$/.test(l) || /\b(johannesburg|jhb|pretoria|pta|cape town|durban|sandton|midrand|germiston|boksburg|benoni|kempton park|centurion|randburg|roodepoort|alberton|edenvale|springs|denver|kramerville|wadeville|isando|spartan|gauteng)\b/i.test(l)){ addr.push(l); used[i] = 1; }
+  });
+  r.address = addr.slice(0, 4).join(", ");
+  return r;
+}
+
+// ---------- list ----------
+function render(){
+  var root = document.getElementById("app");
+  if(!user) return;
+  if(!core.userHasApp(user, "suppliers")){ root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">You don\'t have access to Suppliers. Ask Sean to tick "Suppliers" for you in the Users app.</p><a class="btn" href="../">Back to menu</a></div>'; return; }
+  var all = sups(), q = ui.search.trim().toLowerCase();
+  var shown = all.filter(function(s){
+    var ap = s.apps || {};
+    if(ui.filter === "board" && !ap.board) return false;
+    if(ui.filter === "consumables" && !ap.consumables) return false;
+    if(ui.filter === "thin" && SL.hasDetails(s)) return false;
+    return !q || [s.name, s.contact, s.tel, s.cell, s.email, s.cc, s.address, s.notes].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  var thin = all.filter(function(s){ return !SL.hasDetails(s); }).length;
+  var h = '<div class="stats"><div><b>' + all.length + '</b><span>suppliers</span></div><div><b>' + all.filter(function(s){ return s.apps && s.apps.board; }).length + '</b><span>Board Stock</span></div><div><b>' + all.filter(function(s){ return s.apps && s.apps.consumables; }).length + '</b><span>Consumables</span></div><div><b style="color:var(--amber)">' + thin + '</b><span>need details</span></div></div>';
+  if(canEdit()) h += '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="supCard">📇 Add from a business card</button><button class="btn" id="supAdd">＋ Add supplier</button></div>';
+  h += '<div class="card"><div class="tabs">' + [["all","All"],["board","Board Stock"],["consumables","Consumables"],["thin","Need details"]].map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
+    '<input id="search" placeholder="Search name, person, number, email…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
+  if(!shown.length) h += '<div class="empty">' + (all.length ? "No suppliers match." : "No suppliers yet." + (canEdit() ? " Tap “Add supplier” or scan a business card." : "")) + '</div>';
+  else h += '<div class="slist">' + shown.map(function(s){
+    var ap = s.apps || {}, u = usage(s), ok = SL.hasDetails(s);
+    var ph = [s.tel ? "☎ " + telLink(s.tel) : "", s.cell ? "📱 " + telLink(s.cell) : "", s.fax ? "Fax " + esc(s.fax) : ""].filter(Boolean).join(" · ");
+    return '<div class="sup' + (ok ? "" : " thin") + '"><div class="h"><div><b>' + esc(s.name) + '</b>' +
+        '<div class="apps">' + SL.APPS.map(function(a){ return '<span class="pill' + (ap[a.key] ? " on" : "") + '">' + (ap[a.key] ? "✓ " : "") + a.label + '</span>'; }).join("") +
+        (s.needsDetails ? '<span class="pill warn">New — from ' + esc(s.addedFrom || "Orders") + '</span>' : '') + '</div></div>' +
+        (canEdit() ? '<button class="btn btn-sm" data-edit="' + esc(s.id) + '">✎ Edit</button>' : '') + '</div>' +
+      '<div class="g">' + (s.contact ? '<div>👤 ' + esc(s.contact) + (s.title ? ' <span class="muted">· ' + esc(s.title) + '</span>' : '') + '</div>' : '') +
+        (ph ? '<div>' + ph + '</div>' : '') +
+        (s.email ? '<div>✉ <a href="mailto:' + esc(s.email) + '">' + esc(s.email) + '</a>' + (s.cc ? ' <span class="muted">cc ' + esc(s.cc) + '</span>' : '') + '</div>' : '') +
+        (s.address ? '<div>📍 <a href="https://maps.google.com/?q=' + encodeURIComponent(s.address) + '" target="_blank" rel="noopener">' + esc(s.address) + '</a></div>' : '') +
+        (s.website ? '<div>🌐 <a href="' + esc(/^http/.test(s.website) ? s.website : "https://" + s.website) + '" target="_blank" rel="noopener">' + esc(s.website) + '</a></div>' : '') +
+        (s.notes ? '<div class="muted">📝 ' + esc(s.notes) + '</div>' : '') +
+        (ok ? '' : '<div class="small" style="color:var(--amber)">Missing ' + [!(s.tel || s.cell) ? "phone number" : "", !s.address ? "address" : ""].filter(Boolean).join(" and ") + '.</div>') +
+        '<div class="small muted">' + [u.boards ? u.boards + " board" + (u.boards===1?"":"s") : "", u.cons ? u.cons + " consumable" + (u.cons===1?"":"s") : "", u.orders ? u.orders + " open order" + (u.orders===1?"":"s") : "", s.sendDirect ? "weekly reorder goes straight to them" : ""].filter(Boolean).join(" · ") +
+        (s.cardUrl ? (u.boards || u.cons || u.orders ? " · " : "") + '<a href="' + esc(s.cardUrl) + '" target="_blank" rel="noopener">📇 Business card</a>' : '') + '</div></div></div>';
+  }).join("") + '</div>';
+  h += '</div>';
+  root.innerHTML = h;
+  bind();
+}
+function q(s){ return document.querySelector(s); }
+function qa(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+function bind(){
+  qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
+  if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
+  if(q("#supAdd")) q("#supAdd").onclick = function(){ openSupplier(null, { apps:{} }); };
+  if(q("#supCard")) q("#supCard").onclick = cardModal;
+  qa("[data-edit]").forEach(function(b){ b.onclick = function(){ var id = b.getAttribute("data-edit"); var s = D.master[id]; if(s) openSupplier(id, Object.assign({}, s)); }; });
+}
+
+// ---------- add / edit ----------
+function supForm(s){
+  var f = function(id, lab, val, ph, type){ return '<div><label>' + lab + '</label><input id="sf_' + id + '"' + (type ? ' type="' + type + '"' : '') + ' value="' + esc(val || "") + '" placeholder="' + esc(ph || "") + '"></div>'; };
+  var ap = s.apps || {};
+  return '<label>Supplier (company) name</label><input id="sf_name" value="' + esc(s.name || "") + '" placeholder="e.g. National Edging">' +
+    '<div class="grid2">' + f("contact", "Contact person", s.contact, "e.g. Lindani") + f("title", "Job title", s.title, "e.g. Sales rep") +
+    f("tel", "Telephone", s.tel, "011 …", "tel") + f("cell", "Cell", s.cell, "08…", "tel") +
+    f("fax", "Fax", s.fax) + f("website", "Website", s.website, "www…") +
+    f("email", "Email (orders & reorders go here)", s.email, "sales@…", "email") + f("cc", "CC email", s.cc, "accounts@…") + '</div>' +
+    '<label>Address</label><textarea id="sf_address" rows="2" placeholder="Street, area, city, code">' + esc(s.address || "") + '</textarea>' +
+    '<label>Notes</label><input id="sf_notes" value="' + esc(s.notes || "") + '" placeholder="e.g. account no., trading hours">' +
+    '<label style="margin-top:14px">Show this supplier in</label>' +
+    SL.APPS.map(function(a){ return '<label class="tick"><input type="checkbox" data-app="' + a.key + '"' + (ap[a.key] ? " checked" : "") + '> <span>' + a.label + '</span></label>'; }).join("") +
+    '<label class="tick" style="margin-left:30px"><input type="checkbox" id="sf_sendDirect"' + (s.sendDirect ? " checked" : "") + '> <span class="small">Board Stock: send the weekly reorder email straight to this supplier (skip reviewing it first)</span></label>' +
+    '<p class="small muted" style="margin:4px 0 0">Orders and Stock In can use every supplier on this list.</p>';
+}
+function openSupplier(id, s, note, card){
+  if(!canEdit()) return;
+  s = s || {};
+  openModal('<h2>' + (card ? "📇 Business card" : id ? esc(s.name) : "Add supplier") + '</h2>' + (note || "") +
+    (card && card.preview ? '<img src="' + card.preview + '" class="cardimg" alt="Business card">' : '') + supForm(s) +
+    '<div class="row" style="justify-content:space-between;margin-top:16px">' + (id ? '<button class="btn" id="mDel" style="color:#E39A80">Delete</button>' : '<span></span>') +
+    '<div class="row"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save supplier</button></div></div>');
+  q("#mCancel").onclick = closeModal;
+  if(q("#mDel")) q("#mDel").onclick = function(){ deleteSupplier(id); };
+  q("#mOk").onclick = async function(){
+    if(!freshUser() || !canEdit()) return;
+    var v = {}; ["name","contact","title","tel","cell","fax","website","email","cc","address","notes"].forEach(function(k){ var e = q("#sf_" + k); v[k] = e ? e.value.trim() : ""; });
+    if(!v.name){ toast("Type the supplier's name.", "err"); return; }
+    var dup = SL.findByName(D.master, v.name);
+    if(dup && dup.id !== id){ toast("There's already a supplier called " + dup.name + ". Edit that one instead.", "err"); return; }
+    v.apps = {}; qa("[data-app]").forEach(function(c){ if(c.checked) v.apps[c.getAttribute("data-app")] = true; });
+    v.sendDirect = !!(q("#sf_sendDirect") && q("#sf_sendDirect").checked) && !!v.apps.board;
+    var old = id ? D.master[id] || {} : {};
+    // unticking an app: the boards / items using this supplier lose it — check first
+    var clear = {}, off = [];
+    SL.APPS.forEach(function(a){ if(old.apps && old.apps[a.key] && !v.apps[a.key]){ var u = usage(Object.assign({ id:id }, old)); var n = a.key === "board" ? u.boards : u.cons; if(n) off.push(n + " " + (a.key === "board" ? "board" : "consumable") + (n===1?"":"s") + " in " + a.label); Object.assign(clear, clearRefs(a.key, (old.links || {})[a.key])); } });
+    if(off.length && !confirm(off.join(" and ") + " use " + old.name + ". They'll show no supplier if you take it off. Carry on?")) return;
+    var btn = this; btn.disabled = true;
+    try{
+      if(!id){ id = SL.keyFor(v.name); while(D.master[id]) id += "_"; v.created = new Date().toISOString(); v.createdBy = user.username; v.addedFrom = card ? "business card" : "Suppliers app"; }
+      var rec = Object.assign({}, v, { links:old.links || {}, cardUrl:old.cardUrl || "", updatedBy:user.username, updatedAt:new Date().toISOString(), needsDetails:null });
+      if(card && card.file){ var url = await uploadCard(id, card.file); if(url) rec.cardUrl = url; }
+      var upd = Object.assign(clear, SL.saveUpdates(id, rec, ctx()));
+      await db.ref().update(upd);
+      closeModal(); toast("Saved " + v.name + ".", "ok"); render();
+    }catch(e){ btn.disabled = false; toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+// Boards / consumables pointing at a supplier copy that's being removed.
+function clearRefs(appKey, sid){
+  var u = {}; if(!sid) return u;
+  if(appKey === "board"){ var bs = D.boards || []; Object.keys(bs).forEach(function(i){ if(bs[i] && bs[i].supplierId === sid) u["boardStock/boards/" + i + "/supplierId"] = ""; }); }
+  else { [["screwItems", D.consItems], ["consumableTypes", D.consTypes]].forEach(function(p){ Object.keys(p[1] || {}).forEach(function(k){ if(p[1][k] && p[1][k].supplierId === sid) u["consumablesStock/" + p[0] + "/" + k + "/supplierId"] = null; }); }); }
+  return u;
+}
+async function deleteSupplier(id){
+  var s = D.master[id]; if(!s || !freshUser() || !canEdit()) return;
+  var u = usage(Object.assign({ id:id }, s));
+  var msg = "Delete " + s.name + " from the supplier list?" + (u.boards || u.cons ? "\n\n" + [u.boards ? u.boards + " board(s)" : "", u.cons ? u.cons + " consumable(s)" : ""].filter(Boolean).join(" and ") + " use this supplier — they'll show no supplier." : "") + "\n\nOld orders keep the supplier's name.";
+  if(!confirm(msg)) return;
+  try{
+    var upd = Object.assign(clearRefs("board", (s.links || {}).board), clearRefs("consumables", (s.links || {}).consumables), SL.deleteUpdates(id, s, ctx()));
+    await db.ref().update(upd);
+    closeModal(); toast(s.name + " deleted.", "ok"); render();
+  }catch(e){ toast("Couldn't delete: " + (e.message || e), "err"); }
+}
+async function uploadCard(id, file){
+  if(!file || !firebase.storage) return "";
+  try{ var ref = firebase.storage().ref("supplierCards/" + id + "-" + Date.now() + "-" + String(file.name || "card.jpg").replace(/[^\w.\-]+/g, "_")); await ref.put(file); return await ref.getDownloadURL(); }
+  catch(e){ console.warn("card upload", e); return ""; }
+}
+
+// ---------- business card ----------
+function cardModal(){
+  if(!canEdit()) return;
+  openModal('<h2>📇 Add from a business card</h2><p class="small muted" style="margin-top:0">Take a photo of the card (or pick a picture / PDF). The app reads the company, name, phone numbers, email and address — check them, then save.</p>' +
+    '<label class="btn btn-primary" style="display:inline-flex;margin-top:6px">📷 Photo of the card<input type="file" id="cardFile" accept="image/*,application/pdf" capture="environment" style="display:none"></label>' +
+    '<label class="btn" style="display:inline-flex;margin:6px 0 0 6px">🖼 Choose a picture<input type="file" id="cardPick" accept="image/*,application/pdf" style="display:none"></label>' +
+    '<div class="small muted" id="status" style="margin-top:12px"></div><div class="prog"><i id="barI" style="width:0%"></i></div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button></div>');
+  q("#mCancel").onclick = closeModal;
+  var go = async function(){
+    var file = this.files && this.files[0]; if(!file) return;
+    try{
+      setStatus("Reading the card…", 0.05);
+      var text = "", preview = "";
+      if(/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)){
+        var pdfjs = await pdfLib(), pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise, pg = await pdf.getPage(1);
+        var tc = await pg.getTextContent(); text = tc.items.map(function(i){ return i.str + (i.hasEOL ? "\n" : "   "); }).join("");
+        var vp = pg.getViewport({ scale: 2 }), c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise; preview = c.toDataURL("image/jpeg", 0.6);
+        if(text.replace(/\s/g, "").length < 20) text = await ocr(c, "the card");
+      } else { var cv = await imageToCanvas(file); preview = cv.toDataURL("image/jpeg", 0.6); text = await ocr(cv, "the card"); }
+      var r = parseCard(text);
+      var ex = r.name ? SL.findByName(D.master, r.name) : null;
+      var merged = Object.assign({ apps:{} }, ex || {}); Object.keys(r).forEach(function(k){ if(r[k]) merged[k] = r[k]; });
+      // a rep's own email doesn't replace the supplier's orders email — it goes in CC instead
+      if(ex && ex.email && r.email && low(r.email) !== low(ex.email)){ merged.email = ex.email; merged.cc = ex.cc || r.email; }
+      openSupplier(ex ? ex.id : null, merged, '<div class="check small" style="margin-bottom:8px">' + (ex ? 'This card matches <b>' + esc(ex.name) + '</b> — the card\'s details will be added to that supplier.' : 'New supplier read from the card — tick which apps it belongs in.') + ' Check everything before saving.</div>', { file:file, preview:preview });
+    }catch(e){ console.warn(e); toast("Couldn't read the card: " + (e.message || e), "err"); setStatus(""); }
+  };
+  q("#cardFile").onchange = go; q("#cardPick").onchange = go;
+}
+
+// ---------- start ----------
+var started = false, imported = false;
+function start(){
+  if(started) return; started = true;
+  db = firebase.database();
+  var rr = function(){ if(busy) return; if(!document.getElementById("modal").classList.contains("hide")){ render.pending = true; return; } render(); maybeImport(); };
+  var on = function(path, k){ db.ref(path).on("value", function(s){ D[k] = s.val() || (k === "boards" ? [] : {}); D.got[k] = 1; rr(); }); };
+  on("suppliers/list", "master"); on("boardStock/suppliers", "board"); on("boardStock/boards", "boards");
+  on("consumablesStock/suppliers", "cons"); on("consumablesStock/screwItems", "consItems"); on("consumablesStock/consumableTypes", "consTypes");
+  on("orders/suppliers", "book"); on("orders/list", "orders");
+  render();
+}
+// First time (and whenever another app still has a supplier that isn't linked), bring it into the one list.
+async function maybeImport(){
+  if(imported || !canEdit()) return;
+  if(!["master","board","cons","book"].every(function(k){ return D.got[k]; })) return;
+  imported = true;
+  var r = SL.importUpdates(D.master, ctx(), D.book, user.username);
+  if(!r.count) return;
+  try{ await db.ref().update(r.updates); toast("Brought in " + r.count + " supplier" + (r.count===1?"":"s") + " from Board Stock, Consumables and Orders.", "ok"); }
+  catch(e){ console.warn("import", e); imported = false; }
+}
+try{
+  core.init();
+  core.startUsersSync(function(users){
+    var r = S.resolve(users);
+    if(r.status === "wait") return;
+    if(r.status !== "ok"){ S.goHome({ next:"suppliers" }); return; }
+    user = r.user; document.getElementById("who").textContent = user.username;
+    start();
+  });
+}catch(e){ document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>'; }
+if(!S.get()) S.goHome({ next:"suppliers" });
+})();
+</script>
+<script>
+/* Oak Joinery — shared "← Back" button (2026-09-30, per Sean: "let's put back
+   buttons in all apps"). Adds a Back button next to every "☰ Menu" button and
+   makes the phone's own back button do the same thing. Back goes, in order:
+     1. out of an open pop-up (a delivery note opened from the list goes back
+        to the list),
+     2. to the previous screen in the app (Orders / Tools detail pages, or the
+        last tab you were on),
+     3. to the Oak Joinery menu.
+   Apps can tell it about their tabs with window.OAK_BACK_TABS = { get, set }. */
+(function(){
+  "use strict";
+  if (window.__oakBack) return; window.__oakBack = true;
+  var tabStack = [], lastTab = null, goingBack = false;
+
+  function visible(el){
+    if (!el || !el.isConnected) return false;
+    var cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  var OVERLAYS = "#noteBg, #allBg, .modal-bg, .modal-overlay, .mbg, #modal-root .modal-backdrop, #modal-root > div";
+  function topOverlay(){
+    var list = Array.prototype.slice.call(document.querySelectorAll(OVERLAYS)).filter(visible)
+      .filter(function(el){ return el.id !== "loginOverlay" && !el.closest("#loginOverlay") && !/login/i.test(el.id || ""); });
+    return list.length ? list[list.length - 1] : null;
+  }
+  function closeButtonIn(el){
+    var b = el.querySelector(".note-back");
+    if (b && visible(b)) return b;
+    var btns = Array.prototype.slice.call(el.querySelectorAll("button")).filter(visible);
+    return btns.find(function(x){ return /(^|\s)(close-x|modal-close)(\s|$)/.test(x.className) || x.id === "mCancel" || x.id === "modal-cancel"; }) ||
+           btns.find(function(x){ return /^\s*(cancel|close|done|back|×|✕)\s*$/i.test(x.textContent); }) || null;
+  }
+  function goMenu(){
+    try { if (window.OakCore && OakCore.session && OakCore.session.get()) { OakCore.session.goHome(); return; } } catch (e) {}
+    location.href = "https://seanoakjoinery.github.io/oak-core/";
+  }
+  function back(){
+    var ov = topOverlay();
+    if (ov){
+      var b = closeButtonIn(ov);
+      if (b){ b.click(); return true; }
+      if (typeof window.closeModal === "function"){ window.closeModal(); return true; }
+      ov.remove(); return true;
+    }
+    var link = Array.prototype.slice.call(document.querySelectorAll(".backlink#back, #back.backlink")).filter(visible)[0];
+    if (link){ link.click(); return true; }
+    var T = window.OAK_BACK_TABS;
+    if (T && tabStack.length){
+      goingBack = true;
+      var t = tabStack.pop(); lastTab = t;
+      try { T.set(t); } finally { goingBack = false; }
+      return true;
+    }
+    goMenu(); return false;
+  }
+  window.oakBack = back;
+
+  // Remember the tab you came from.
+  function trackTab(){
+    var T = window.OAK_BACK_TABS; if (!T) return;
+    var cur; try { cur = T.get(); } catch (e) { return; }
+    if (cur === undefined || cur === null) return;
+    if (lastTab !== null && cur !== lastTab && !goingBack){ tabStack.push(lastTab); if (tabStack.length > 30) tabStack.shift(); }
+    lastTab = cur;
+  }
+
+  // Put a Back button in front of every Menu button (apps redraw, so keep checking).
+  function addButtons(){
+    var menus = Array.prototype.slice.call(document.querySelectorAll("button, a")).filter(function(x){
+      return /☰\s*Menu/.test(x.textContent || "") && !x.dataset.oakBackDone;
+    });
+    menus.forEach(function(m){
+      m.dataset.oakBackDone = "1";
+      var b = document.createElement(m.tagName === "A" ? "button" : m.tagName);
+      b.type = "button";
+      b.className = m.className;
+      b.setAttribute("style", (m.getAttribute("style") || "") + ";margin-right:6px");
+      b.textContent = "← Back";
+      b.title = "Back to the previous screen";
+      b.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); back(); });
+      m.parentNode.insertBefore(b, m);
+    });
+  }
+  function tick(){ addButtons(); trackTab(); }
+  new MutationObserver(tick).observe(document.documentElement, { childList:true, subtree:true });
+  document.addEventListener("click", function(){ setTimeout(trackTab, 0); }, true);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+
+  // The phone's own back button does the same as the Back button.
+  try {
+    history.pushState({ oakBack:1 }, "");
+    window.addEventListener("popstate", function(){
+      var stay = back();
+      if (stay) history.pushState({ oakBack:1 }, "");
+    });
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
