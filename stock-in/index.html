@@ -849,9 +849,9 @@ function newFieldsHtml(l){
 }
 function render(){
   var root = document.getElementById("app");
-  var targets = Object.keys(TARGETS).filter(function(k){ return allowed(user, k); });
+  var targets = core.userHasApp(user, "stockIn") ? Object.keys(TARGETS).filter(function(k){ return allowed(user, k); }) : [];
   if(!targets.length){
-    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">You can\'t add stock to any app yet. Ask Sean to give you "Add stock" in Board Stock, Consumables or Stock List.</p><a class="btn" href="../">Back to menu</a></div>';
+    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">' + (core.userHasApp(user, "stockIn") ? 'You can\'t add stock to any app yet. Ask Sean to give you "Add stock" in Board Stock, Consumables or Stock List.' : 'You don\'t have access to Stock In. Ask Sean to tick "Stock In app" for you in Dispatch → Manage users.') + '</p><a class="btn" href="../">Back to menu</a></div>';
     document.getElementById("sum").classList.add("hide"); return;
   }
   if(targets.length === 1 && !st.target) chooseTarget(targets[0], true);
