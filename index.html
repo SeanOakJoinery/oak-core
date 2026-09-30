@@ -97,13 +97,16 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
       icon:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' },
     { id:"stockIn",     name:"Stock In",    desc:"Delivery notes, invoices, Excel", url:"/oak-core/stock-in/",
       icon:'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>',
-      visible: function(u){ return stockInAllowed(u); } },
+      visible: function(u){ return core.userHasApp(u, "stockIn") && stockInAllowed(u); } },
     { id:"orders",      name:"Orders",      desc:"Supplier orders & deliveries", url:"/oak-core/orders/",
       icon:'<path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h3"/>',
-      visible: function(u){ return ordersAllowed(u); } },
+      visible: function(u){ return core.userHasApp(u, "orders"); } },
     { id:"tools",       name:"Tools",       desc:"Sign tools out & in", url:"/oak-core/tools/",
       icon:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
-      visible: function(u){ return !!u; } }
+      visible: function(u){ return core.userHasApp(u, "tools"); } },
+    { id:"users",       name:"Users",       desc:"People, PINs & app access", url:"/oak-core/users/",
+      icon:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c2.3.1 4.2 1.7 4.8 4.7"/>',
+      visible: function(u){ return !!u && (core.isMainRoot(u) || u.isRoot || hasPerm(u, "manageUsers")); } }
   ];
   function hasPerm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
   // Stock In shows for anyone who may add stock to at least one app.
@@ -115,7 +118,8 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
 
   // Orders shows for anyone who may add stock to Board Stock or Consumables.
   function ordersAllowed(u){
-    return (core.userHasApp(u, "boardStock") && hasPerm(u, "boardAddQty")) ||
+    return hasPerm(u, "ordersQuotes") || hasPerm(u, "ordersApprove") ||
+           (core.userHasApp(u, "boardStock") && hasPerm(u, "boardAddQty")) ||
            (core.userHasApp(u, "consumables") && (hasPerm(u, "consManageItems") || hasPerm(u, "consManageConsumables")));
   }
 
