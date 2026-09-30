@@ -107,6 +107,9 @@ table.ol tr.full td{color:var(--muted)}
 .mbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
 .mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:460px;max-height:90vh;overflow:auto}
 .tick{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--text)}.tick input{width:20px;height:20px;accent-color:var(--amber)}
+.ccbox{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px}
+.ccbox input{flex:1;min-width:180px;border:none;background:transparent;padding:6px}
+.ccmain{background:var(--amber-dim);color:var(--amber);border-radius:99px;padding:5px 10px;font-size:13px;white-space:nowrap}
 .check{border:1px solid var(--amber);background:var(--amber-dim);border-radius:10px;padding:12px}
 /* Purchase order — A4 on the letterhead */
 .po-wrap{overflow-x:auto}
@@ -643,6 +646,16 @@ function matchStock(src, codeUnique){
 
 // ---------- suppliers ----------
 var SUP_FIELDS = ["contact","title","tel","cell","fax","email","cc","address","website","cardUrl","notes"];
+// Sophie is always CC'd on purchase orders (2026-09-30). Extra CC addresses go next to her.
+var MAIN_CC = { name:"Sophie Radford", email:"sophie@oakjoinery.co.za" };
+function extraCc(v){ return String(v || "").split(/[,;\s]+/).map(function(e){ return e.trim().replace(/^<|>$/g, ""); })
+  .filter(function(e){ return /@/.test(e) && e.toLowerCase() !== MAIN_CC.email; })
+  .filter(function(e, i, a){ return a.map(function(x){ return x.toLowerCase(); }).indexOf(e.toLowerCase()) === i; }).join(", "); }
+function allCc(o){ return [MAIN_CC.email].concat(extraCc(o && o.supplierCc).split(", ").filter(Boolean)); }
+function ccField(id, val){
+  return '<label>CC</label><div class="ccbox"><span class="ccmain" title="Always copied in">🔒 ' + esc(MAIN_CC.name) + ' &lt;' + esc(MAIN_CC.email) + '&gt;</span>' +
+    '<input id="' + id + '" type="text" value="' + esc(extraCc(val)) + '" placeholder="+ add more emails, e.g. accounts@supplier.co.za"></div>';
+}
 function allSuppliers(){
   var seen = {}, out = [];
   [[D.board && D.board.suppliers, "b"], [D.cons.suppliers, "c"]].forEach(function(p){
@@ -938,7 +951,7 @@ function supplierField(val, email){
   var sups = allSuppliers();
   return '<div><label>Supplier</label><input id="dSup" list="supList" value="' + esc(val) + '" placeholder="Start typing…"><datalist id="supList">' + sups.map(function(s){ return '<option value="' + esc(s.name) + '">'; }).join("") + '</datalist></div>' +
          '<div><label>Supplier email (for orders & follow-ups)</label><input id="dEmail" type="email" value="' + esc(email) + '" placeholder="sales@supplier.co.za"></div>' +
-         '<div><label>CC email (second address for orders)</label><input id="dCc" type="text" value="' + esc((draft && draft.supplierCc) || "") + '" placeholder="e.g. accounts@supplier.co.za"></div>';
+         '<div>' + ccField("dCc", draft && draft.supplierCc) + '</div>';
 }
 // Root can add a location here; it's added to Board Stock and Consumables too.
 async function addLocationFlow(){
@@ -1473,17 +1486,17 @@ function poFieldsHtml(o, sup){
       '<label class="tick"><input type="checkbox" id="pfColl"' + (o.collection ? " checked" : "") + '> <span>🚚 Collection <span class="small muted">(we collect)</span></span></label>' +
       '<label class="tick"><input type="checkbox" id="pfUrg"' + (o.urgent ? " checked" : "") + '> <span style="color:#E39A80;font-weight:600">⚠ Urgent</span></label></div>' +
     '<label>Send to (supplier email)</label><input id="aTo" type="email" value="' + esc(o.supplierEmail || sup.email || "") + '" placeholder="sales@supplier.co.za">' +
-    '<label>CC (second email)</label><input id="aCc" type="text" value="' + esc(o.supplierCc || sup.cc || "") + '" placeholder="e.g. accounts@supplier.co.za or someone at Oak">';
+    ccField("aCc", o.supplierCc || sup.cc || "");
 }
 function readPoFields(o){
   var g = function(id){ var e = document.getElementById(id); return e ? e.value.trim() : ""; };
   var c = function(id){ var e = document.getElementById(id); return !!(e && e.checked); };
   return { supplierContact:g("pfContact"), supplierTel:g("pfTel"), supplierFax:g("pfFax"), supplierAddress:g("pfAddr"), jobNo:g("pfJob"),
     asap:c("pfAsap"), collection:c("pfColl"), urgent:c("pfUrg"),
-    supplierEmail:g("aTo"), supplierCc:g("aCc"), dueDate:g("aDue") || null };
+    supplierEmail:g("aTo"), supplierCc:extraCc(g("aCc")), dueDate:g("aDue") || null };
 }
 async function learnSupplier(name, upd){
-  try{ await saveSupplierRec(name, { contact:upd.supplierContact, tel:upd.supplierTel, fax:upd.supplierFax, address:upd.supplierAddress, email:upd.supplierEmail, cc:upd.supplierCc }); }
+  try{ await saveSupplierRec(name, { contact:upd.supplierContact, tel:upd.supplierTel, fax:upd.supplierFax, address:upd.supplierAddress, email:upd.supplierEmail, cc:extraCc(upd.supplierCc) }); }
   catch(e){ console.warn("learnSupplier", e); }
 }
 function editPoModal(o){
@@ -1560,7 +1573,7 @@ function poDocHtml(o){
 function viewPo(o){
   return '<button class="backlink" id="back">' + (ui.poFrom === "list" ? '← All purchase orders' : '← Back to the order') + '</button>' +
     '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="poEmail">✉ Email to supplier</button><button class="btn" id="poPrint">🖨 Print</button><button class="btn" id="poPdf">⬇ Save PDF</button><button class="btn" id="poWa">WhatsApp</button>' + (canApprove() ? '<button class="btn" id="poEdit">✎ Edit PO details</button>' : '') + '</div>' +
-    '<p class="small muted" style="margin:-4px 0 12px">To: <b>' + esc(o.supplierEmail || "no email saved") + '</b>' + (o.supplierCc ? ' · CC: <b>' + esc(o.supplierCc) + '</b>' : '') + (o.poSentAt ? ' · last emailed ' + esc(new Date(o.poSentAt).toLocaleString("en-ZA")) : '') + '</p>' +
+    '<p class="small muted" style="margin:-4px 0 12px">To: <b>' + esc(o.supplierEmail || "no email saved") + '</b>' + ' · CC: <b>' + esc(allCc(o).join(", ")) + '</b>' + (o.poSentAt ? ' · last emailed ' + esc(new Date(o.poSentAt).toLocaleString("en-ZA")) : '') + '</p>' +
     '<div class="po-wrap">' + poDocHtml(o) + '</div>';
 }
 async function poPdfBlob(){
@@ -1601,7 +1614,7 @@ async function emailPo(o){
     (o.asap ? (o.collection ? "Collection" : "Delivery") + " date: ASAP\n" : o.dueDate ? (o.collection ? "Collection" : "Delivery") + " date: " + fmtDate(o.dueDate) + "\n" : "") +
     (o.poUrl ? "\nPO (PDF): " + o.poUrl + "\n" : "") +
     "\nPlease quote PO " + o.po + " on your delivery note and invoice.\n\nKind regards,\n" + user.username + "\nOak Joinery (Pty) Ltd";
-  var href = "mailto:" + encodeURIComponent(o.supplierEmail).replace(/%40/g, "@") + "?" + (o.supplierCc ? "cc=" + encodeURIComponent(o.supplierCc).replace(/%40/g, "@").replace(/%2C/gi, ",") + "&" : "") +
+  var href = "mailto:" + encodeURIComponent(o.supplierEmail).replace(/%40/g, "@") + "?" + "cc=" + encodeURIComponent(allCc(o).join(",")).replace(/%40/g, "@").replace(/%2C/gi, ",") + "&" +
     "subject=" + encodeURIComponent((o.urgent ? "URGENT — " : "") + "Purchase Order PO " + o.po + " — Oak Joinery") + "&body=" + encodeURIComponent(body);
   await db.ref("orders/list/" + o.id).update({ poSentAt:new Date().toISOString(), poSentBy:user.username });
   window.location.href = href;
@@ -1621,7 +1634,7 @@ function readDraftFields(){
   if(!draft) return;
   if(g("dSup") !== undefined) draft.supplier = g("dSup");
   if(g("dEmail") !== undefined) draft.supplierEmail = g("dEmail").trim();
-  if(g("dCc") !== undefined) draft.supplierCc = g("dCc").trim();
+  if(g("dCc") !== undefined) draft.supplierCc = extraCc(g("dCc"));
   if(g("dRef") !== undefined) draft.ref = g("dRef").trim();
   if(g("dQDate") !== undefined) draft.quoteDate = g("dQDate");
   if(g("dODate") !== undefined) draft.orderedDate = g("dODate");
