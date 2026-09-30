@@ -103,6 +103,42 @@ table.ol tr.full td{color:var(--muted)}
 .backlink{background:none;border:none;color:var(--amber);font:inherit;cursor:pointer;padding:0;margin-bottom:10px}
 .line .lrow.r{grid-template-columns:1fr 92px 34px}
 .sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:100%;max-width:460px;max-height:90vh;overflow:auto}
+.tick{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--text)}.tick input{width:20px;height:20px;accent-color:var(--amber)}
+.check{border:1px solid var(--amber);background:var(--amber-dim);border-radius:10px;padding:12px}
+/* Purchase order — A4 on the letterhead */
+.po-wrap{overflow-x:auto}
+body.po-view .wrap{max-width:860px}
+.po-page{background:#fff;color:#2A2519;width:794px;max-width:100%;min-height:1123px;margin:0 auto 18px;padding:48px 56px;display:flex;flex-direction:column;box-shadow:0 6px 30px rgba(0,0,0,.45);font-family:var(--font-b)}
+.po-lh{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#78756E;color:#F3EEDF;border-radius:10px;padding:20px 24px}
+.po-name{font-size:18px;font-weight:600}.po-addr{font-size:11.5px;color:#DCD5C0;margin-top:2px}.po-reg{font-family:var(--font-m);font-size:10px;color:#DCD5C0;margin-top:4px}
+.po-div{align-self:stretch;width:1px;background:rgba(243,238,223,.35)}
+.po-logo{display:flex;flex-direction:column;align-items:flex-end;line-height:1}.po-logo span{font-weight:300;font-size:25px;letter-spacing:.3em}.po-logo small{font-weight:500;font-size:9.5px;letter-spacing:.38em;margin-top:5px}
+.po-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2A2519;padding:18px 0 10px;margin-bottom:12px}
+.po-head h3{font-family:var(--font-m);font-size:30px;text-transform:uppercase;margin:0;letter-spacing:.02em;color:#2A2519}
+.po-num{font-family:var(--font-m);font-size:14px;font-weight:600;color:#2A2519;margin-top:2px}
+.po-date{text-align:right;font-size:14px}.po-date span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a7f63}
+.po-rows>div{display:flex;gap:10px;font-size:14px;padding:3px 0;color:#2A2519}.po-rows>div>span:first-child{width:110px;flex-shrink:0;color:#5A5238}
+.po-items{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px;color:#2A2519}
+.po-items th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a8060;border-bottom:1px solid #B9AF93;padding:6px 6px}
+.po-items td{border-bottom:1px dotted #C9BFA5;padding:7px 6px;vertical-align:top}.po-items td.n,.po-items th.n{text-align:center;width:50px}.po-items td:first-child{width:28px;color:#8a7f63}
+.po-size{color:#8a7f63;font-size:12.5px}
+.po-bottom{margin-top:auto;padding-top:14px}
+.po-notes{font-size:13px;margin-bottom:8px}.po-quote{font-size:13px;border-top:1px solid #B9AF93;padding-top:10px}
+.po-sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:36px}.po-line{border-top:1px solid #2A2519;height:1px}
+.po-lab{font-family:var(--font-m);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#5A5238;margin-top:5px}.po-when{font-family:var(--font-m);font-size:10px;color:#8a7f63;margin-top:2px}
+.po-foot{display:flex;justify-content:space-between;font-family:var(--font-m);font-size:9.5px;color:#8a7f63;margin-top:14px}
+.pdf-mode .po-page{width:794px !important;height:1123px !important;min-height:1123px !important;max-width:none !important;margin:0 !important;box-shadow:none !important}
+@page{size:A4;margin:0}
+@media print{
+  body *{visibility:hidden}
+  #poDoc,#poDoc *{visibility:visible}
+  #poDoc{position:absolute;top:0;left:0;width:210mm}
+  .po-page{width:210mm !important;height:297mm !important;min-height:0 !important;max-width:none !important;margin:0 !important;padding:14mm 16mm !important;box-shadow:none !important;break-after:page;page-break-after:always;overflow:hidden}
+  .po-page:last-child{break-after:auto;page-break-after:auto}
+}
 </style>
 </head>
 <body>
@@ -115,6 +151,7 @@ table.ol tr.full td{color:var(--muted)}
 </div>
 <div class="sum hide" id="sum"><div class="in"><div id="sumText" class="small"></div><button class="btn btn-primary" id="commit">Save</button></div></div>
 <div class="toast" id="toast"></div>
+<div id="modal" class="hide"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
@@ -496,7 +533,11 @@ var LATE_DAYS = 7;
 function perm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
 function canBoard(u){ return core.userHasApp(u, "boardStock") && perm(u, "boardAddQty"); }
 function canCons(u){ return core.userHasApp(u, "consumables") && (perm(u, "consManageItems") || perm(u, "consManageConsumables")); }
-function allowed(u){ return canBoard(u) || canCons(u); }
+function perm2(u, k){ return !!(u && (core.isMainRoot(u) || u.isRoot || (u.permissions && u.permissions[k]))); }
+// Add / upload quotes: given in Dispatch → Manage users (main root only).
+function canQuote(u){ return perm2(u || user, "ordersQuotes"); }
+// App access is ticked per user in Dispatch → Manage users → "Orders app".
+function allowed(u){ return core.userHasApp(u, "orders"); }
 
 // ---------- state ----------
 var user = null;
@@ -589,9 +630,9 @@ function allSuppliers(){
   [[D.board && D.board.suppliers, "b"], [D.cons.suppliers, "c"]].forEach(function(p){
     Object.keys(p[0] || {}).forEach(function(k){ var s = p[0][k]; if(!s || !s.name) return;
       var key = s.name.trim().toLowerCase(); if(seen[key]){ if(!seen[key].email && s.email) seen[key].email = s.email; return; }
-      seen[key] = { name:s.name.trim(), email:(s.email||"").trim(), contact:s.contactPerson||"" }; out.push(seen[key]); });
+      seen[key] = { name:s.name.trim(), email:(s.email||"").trim(), cc:(s.ccEmail||"").trim(), contact:s.contactPerson||"" }; out.push(seen[key]); });
   });
-  list(D.orders).forEach(function(o){ var key = String(o.supplier||"").trim().toLowerCase(); if(key && !seen[key]){ seen[key] = { name:o.supplier.trim(), email:o.supplierEmail||"" }; out.push(seen[key]); } });
+  list(D.orders).forEach(function(o){ var key = String(o.supplier||"").trim().toLowerCase(); if(key && !seen[key]){ seen[key] = { name:o.supplier.trim(), email:o.supplierEmail||"", cc:o.supplierCc||"" }; out.push(seen[key]); } });
   return out.sort(function(a,b){ return a.name.localeCompare(b.name); });
 }
 
@@ -779,10 +820,12 @@ function render(){
   var root = document.getElementById("app");
   if(!user) return;
   if(!allowed(user)){
-    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">Orders is for people who add stock to Board Stock or Consumables. Ask Sean to give you "Add stock" in one of them.</p><a class="btn" href="../">Back to menu</a></div>';
+    root.innerHTML = '<div class="card"><h2>No access</h2><p class="muted">You do not have access to Orders. Ask Sean to tick "Orders app" for you in Dispatch → Manage users.</p><a class="btn" href="../">Back to menu</a></div>';
     footer(null); return;
   }
-  if(ui.view === "edit" && draft) root.innerHTML = viewEdit();
+  document.body.classList.toggle("po-view", ui.view === "po");
+  if(ui.view === "po" && D.orders[ui.orderId] && D.orders[ui.orderId].po){ var po = D.orders[ui.orderId]; po.id = ui.orderId; footer(null); root.innerHTML = viewPo(po); }
+  else if(ui.view === "edit" && draft) root.innerHTML = viewEdit();
   else if(ui.view === "order" && D.orders[ui.orderId]) root.innerHTML = viewOrder(D.orders[ui.orderId]);
   else if(ui.view === "receive" && rcv) root.innerHTML = viewReceive();
   else { ui.view = "list"; root.innerHTML = viewList(); }
@@ -801,7 +844,7 @@ function orderCard(o){
   var pct = qty ? Math.round((qty - out) / qty * 100) : 0;
   var cls = isLate(o) ? "late" : o.status === "part" ? "part" : (o.status === "received" || o.status === "closed") ? "done" : o.status === "quote" ? "quote" : "";
   return '<div class="ord ' + cls + '" data-open="' + esc(o.id) + '"><div class="h"><b>' + esc(o.supplier || "—") + '</b>' + statusPill(o) + '</div>' +
-    '<div class="small muted">' + (!ui.loc && o.location ? "📍 " + esc(o.location) + " · " : "") + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
+    '<div class="small muted">' + (!ui.loc && o.location ? "📍 " + esc(o.location) + " · " : "") + (o.po ? "<b>PO " + esc(o.po) + "</b> · " : "") + (o.ref ? esc(o.ref) + " · " : "") + lines.length + ' line' + (lines.length===1?"":"s") +
     (o.status === "quote" ? " · quote from " + fmtDate(o.quoteDate || (o.created||"").slice(0,10)) : " · ordered " + fmtDate(o.orderedDate) + (o.dueDate ? " · due " + fmtDate(o.dueDate) : "")) +
     (isOpen(o) && out > 0 ? " · <b style='color:var(--amber)'>" + lines.filter(function(l){ return outstanding(l) > 0; }).length + " line(s) still to come</b>" : "") + '</div>' +
     (o.status !== "quote" ? '<div class="prog"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
@@ -817,14 +860,23 @@ function viewList(){
       var n = every.filter(function(o){ return isOpen(o) && (l ? o.location === l : true); }).length, late = every.filter(function(o){ return isLate(o) && (l ? o.location === l : true); }).length;
       return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") +
       (user.isRoot ? '<button type="button" id="addLoc" style="font-weight:500;color:var(--muted)">＋ Add location</button>' : '') + '</div>';
-  h += '<div class="row" style="margin-bottom:14px"><button class="btn btn-primary" id="newOrder">＋ New order / quote</button><button class="btn" id="rcvAny">📦 Receive a delivery</button></div>';
+  h += '<div class="row" style="margin-bottom:14px">' + (canQuote() ? '<button class="btn btn-primary" id="newOrder">＋ New order / quote</button>' : '') + (canBoard(user) || canCons(user) ? '<button class="btn" id="rcvAny">📦 Receive a delivery</button>' : '') + (user.isRoot ? '<button class="btn" id="poBookBtn">PO numbers' + (poBook() && poBook().to ? ' (' + poLeft() + ' left)' : '') + '</button>' : '') + '</div>';
+  h += poBanner();
+  // Everyone can see who may approve orders and add quotes (set in Dispatch → Manage users).
+  var team = core.getUsers().filter(function(u){ return u && u.username; });
+  var names = function(k){ return team.filter(function(u){ return perm2(u, k); }).map(function(u){ return u.username; }).sort(); };
+  var ap = names("ordersApprove"), qu = names("ordersQuotes");
+  h += '<div class="card" style="padding:12px 14px"><div class="small"><b>Can approve orders:</b> ' + (ap.length ? ap.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">✓ ' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
+       '<div class="small" style="margin-top:6px"><b>Can add quotes:</b> ' + (qu.length ? qu.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
+       '<div class="small muted" style="margin-top:6px">' + (canApprove() ? 'You can approve orders.' : 'You can\'t approve orders — ask Sean if you need to.') + (isMain() ? ' Change this in Dispatch → Manage users.' : '') + '</div></div>';
   if(late.length){
     var dow = new Date().getDay();
     h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — overdue deliveries" : dow === 3 ? "Wednesday check — overdue deliveries" : "Overdue deliveries") + '</h2><p class="small muted" style="margin-top:0">Past the delivery date the supplier gave (or ' + LATE_DAYS + '+ days since ordering if no date was given) and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
   }
-  var filters = [["open","Open orders"],["quote","Quotes"],["done","Received / closed"],["all","All"]];
+  var filters = [["open","Open orders"],["quote","Quotes"],["po","Purchase orders"],["done","Received / closed"],["all","All"]];
   h += '<div class="card"><div class="tabs">' + filters.map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
        '<input id="search" placeholder="Search supplier, order no. or item…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
+  if(ui.filter === "po"){ h += poTabHtml(all) + '</div>'; return h; }
   var shown = all.filter(function(o){
     if(ui.filter === "open") return isOpen(o);
     if(ui.filter === "quote") return o.status === "quote";
@@ -855,7 +907,8 @@ function newSupplierHtml(d){
 function supplierField(val, email){
   var sups = allSuppliers();
   return '<div><label>Supplier</label><input id="dSup" list="supList" value="' + esc(val) + '" placeholder="Start typing…"><datalist id="supList">' + sups.map(function(s){ return '<option value="' + esc(s.name) + '">'; }).join("") + '</datalist></div>' +
-         '<div><label>Supplier email (for follow-ups)</label><input id="dEmail" type="email" value="' + esc(email) + '" placeholder="sales@supplier.co.za"></div>';
+         '<div><label>Supplier email (for orders & follow-ups)</label><input id="dEmail" type="email" value="' + esc(email) + '" placeholder="sales@supplier.co.za"></div>' +
+         '<div><label>CC email (second address for orders)</label><input id="dCc" type="text" value="' + esc((draft && draft.supplierCc) || "") + '" placeholder="e.g. accounts@supplier.co.za"></div>';
 }
 // Root can add a location here; it's added to Board Stock and Consumables too.
 async function addLocationFlow(){
@@ -938,7 +991,8 @@ function viewOrder(o){
   var h = '<button class="backlink" id="back">← All orders</button>';
   h += '<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(o.supplier) + '</h2>' + statusPill(o) + '</div>' +
        '<div class="kv" style="margin-top:10px">' +
-       '<div>Order / quote no.</div><div>' + esc(o.ref || "—") + '</div>' +
+       (o.po ? '<div>PO number</div><div><b>' + esc(o.po) + '</b> · approved by ' + esc(o.approvedBy || "—") + (o.poSentAt ? ' · emailed ' + esc(fmtDate(o.poSentAt.slice(0,10))) : ' · <span style="color:var(--amber)">not emailed yet</span>') + '</div>' : '') +
+       '<div>Quote no.</div><div>' + esc(o.ref || "—") + '</div>' +
        (o.status === "quote" ? '<div>Quote date</div><div>' + fmtDate(o.quoteDate) + '</div>' : '<div>Ordered</div><div>' + fmtDate(o.orderedDate) + ' (' + daysSince(o.orderedDate) + ' days ago)</div>') +
        (o.status !== "quote" ? '<div>Delivery date</div><div>' + (isOpen(o) ? '<input type="date" id="dueSet" value="' + esc(o.dueDate || "") + '" style="width:auto;padding:5px 8px"> <span class="small muted">' + (o.dueDate ? (isLate(o) ? '<span style="color:#E39A80">overdue</span>' : 'as promised by the supplier') : 'none given — overdue after ' + LATE_DAYS + ' days') + '</span>' : (o.dueDate ? fmtDate(o.dueDate) : "—")) + '</div>' : '') +
        '<div>Deliver to</div><div>' + esc(o.location || "—") + '</div>' +
@@ -947,12 +1001,13 @@ function viewOrder(o){
        (o.quoteUrl ? '<div>Quotation</div><div><a style="color:var(--amber)" target="_blank" rel="noopener" href="' + esc(o.quoteUrl) + '">' + esc(o.quoteFile || "open") + '</a></div>' : '') +
        '<div>Added by</div><div>' + esc(o.createdBy || "—") + '</div></div>' +
        '<div class="row" style="margin-top:14px">' +
-       (o.status === "quote" ? '<input type="date" id="placeDate" value="' + today() + '" style="width:auto" title="Date the order was placed"><button class="btn btn-primary" id="placeOrder">✓ Order placed</button>' : '') +
-       (isOpen(o) && out > 0 ? '<button class="btn btn-primary" id="rcvThis">📦 Receive delivery</button>' : '') +
-       ((o.status === "quote" || isOpen(o)) ? '<button class="btn" id="editOrder">Edit</button>' : '') +
+       (o.status === "quote" ? (canApprove() ? '<button class="btn btn-primary" id="approveQ">✓ Approve — PO ' + esc((poBook() && poLeft()) ? poBook().next : "?") + '</button>' : '<span class="pill quote" style="align-self:center">Waiting for approval</span>') : '') +
+       (o.po ? '<button class="btn btn-primary" id="openPo">📄 Purchase order PO ' + esc(o.po) + '</button>' : (isOpen(o) && canApprove() ? '<button class="btn" id="approveQ">Create PO</button>' : '')) +
+       (isOpen(o) && out > 0 && (canBoard(user) || canCons(user)) ? '<button class="btn btn-primary" id="rcvThis">📦 Receive delivery</button>' : '') +
+       ((o.status === "quote" || isOpen(o)) && canQuote() ? '<button class="btn" id="editOrder">Edit</button>' : '') +
        (isOpen(o) && out > 0 ? '<button class="btn" id="closeOrder">Close — rest not coming</button>' : '') +
        ((o.status === "closed" || o.status === "received") && out > 0 ? '<button class="btn" id="reopen">Reopen</button>' : '') +
-       (o.status === "quote" || user.isRoot ? '<button class="btn" id="delOrder" style="color:#E39A80">Delete</button>' : '') + '</div></div>';
+       ((o.status === "quote" && canQuote()) || user.isRoot ? '<button class="btn" id="delOrder" style="color:#E39A80">Delete</button>' : '') + '</div></div>';
   h += '<div class="card"><h2>Lines</h2><div style="overflow-x:auto"><table class="ol"><thead><tr><th>Item</th><th class="n">Ordered</th><th class="n">Received</th><th class="n">Still to come</th></tr></thead><tbody>' +
     lines.map(function(l){ var ot = outstanding(l);
       return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + (l.size ? ' <span class="muted">· ' + esc(l.size) + '</span>' : '') + '<div class="sub">→ ' + esc(stockLabel(l)) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td><td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
@@ -1115,7 +1170,7 @@ async function saveDraft(){
     var quoteUrl = d.file ? await uploadDoc("orderDocs", id, d.file) : (d.quoteUrl || "");
     var o = old ? JSON.parse(JSON.stringify(old)) : { created:new Date().toISOString(), createdBy:user.username, deliveries:{} };
     delete o.id;
-    o.supplier = d.supplier; o.supplierEmail = d.supplierEmail || ""; o.ref = d.ref || ""; o.location = d.location; o.notes = d.notes || "";
+    o.supplier = d.supplier; o.supplierEmail = d.supplierEmail || ""; o.supplierCc = d.supplierCc || ""; o.ref = d.ref || ""; o.location = d.location; o.notes = d.notes || "";
     o.status = d.status === "quote" ? "quote" : (old && isOpen(old) ? old.status : "ordered");
     if(d.status === "quote") o.quoteDate = d.quoteDate || today(); else { o.orderedDate = d.orderedDate || today(); o.dueDate = d.dueDate || null; }
     if(quoteUrl){ o.quoteUrl = quoteUrl; o.quoteFile = d.file ? d.file.name : (d.quoteFile || ""); }
@@ -1256,9 +1311,204 @@ async function setStatus2(o, status, extra){
   try{ await db.ref("orders/list/" + o.id).update(u); toast("Saved.", "ok"); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
 }
 
+// ---------- purchase orders (2026-09-30) ----------
+// Root loads a block of PO numbers (e.g. 20000–20200). "Approve" on a quote
+// takes the next number, turns the quote into an order and makes a Purchase
+// Order on the letterhead, ready to print, save as PDF or email (with CC).
+var PO_LOW = 10;
+var OUR_ADDR = { "Kramerville Sandton": "16 Bowling Avenue, Kramerville, Johannesburg" };
+function poBook(){ return D.poBook || null; }
+function poLeft(){ var b = poBook(); return b && b.to ? Math.max(0, num(b.to) - num(b.next) + 1) : 0; }
+function poBanner(){
+  var b = poBook(), left = poLeft();
+  if(!b || !b.to) return '<div class="card" style="border-color:var(--amber)"><b>No PO numbers loaded yet.</b> <span class="small muted">' + (user.isRoot ? 'Tap “PO numbers” to load your purchase order numbers (e.g. 20000 – 20200).' : 'Ask Sean to load purchase order numbers before quotes can be approved.') + '</span></div>';
+  if(left === 0) return '<div class="card alert"><h2>PO numbers used up</h2><p class="small" style="margin:0">All numbers ' + esc(b.from) + ' – ' + esc(b.to) + ' have been used. ' + (user.isRoot ? 'Tap “PO numbers” to load the next block.' : 'Ask Sean to load the next block of PO numbers.') + '</p></div>';
+  if(left <= PO_LOW) return '<div class="card" style="border-color:var(--amber)"><b style="color:var(--amber)">Only ' + left + ' PO number' + (left===1?'':'s') + ' left</b> <span class="small muted">(' + esc(b.next) + ' – ' + esc(b.to) + '). ' + (user.isRoot ? 'Load the next block under “PO numbers”.' : 'Let Sean know the PO numbers need topping up.') + '</span></div>';
+  return '';
+}
+function addrFor(loc){ var b = poBook() || {}; return (b.addresses && b.addresses[fbKey(loc || "")]) || OUR_ADDR[loc] || ""; }
+// Only the main root, and people the main root has allowed, can approve quotes / create POs.
+function isMain(){ return !!(user && core.isMainRoot(user)); }
+// Given in Dispatch → Manage users → "Approve quotes & send purchase orders (Orders app)" (main root only).
+function canApprove(){ return isMain() || !!(user && (user.isRoot || (user.permissions && user.permissions.ordersApprove))); }
+function openApprovers(){
+  if(!isMain()) return;
+  var team = core.getUsers().filter(function(u){ return u && u.username && !core.isMainRoot(u); }).sort(function(a,b){ return a.username.localeCompare(b.username); });
+  openModal('<h2>Who can approve orders</h2><p class="small muted" style="margin-top:0">Ticked people can approve quotes, give out PO numbers and send purchase orders. You (main root) always can.</p>' +
+    (team.length ? team.map(function(u){ return '<label class="tick" style="margin:8px 0"><input type="checkbox" data-appr="' + esc(u.id) + '"' + (D.approvers && D.approvers[u.id] ? " checked" : "") + '> <span>' + esc(u.username) + (u.isRoot ? ' <span class="small muted">(root)</span>' : '') + '</span></label>'; }).join("") : '<div class="empty">No other users yet.</div>') +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    if(!freshUser() || !isMain()) return;
+    var a = {}; document.querySelectorAll("[data-appr]").forEach(function(c){ if(c.checked) a[c.getAttribute("data-appr")] = true; });
+    try{ await db.ref("orders/approvers").set(a); D.approvers = a; closeModal(); toast("Saved who can approve orders.", "ok"); render(); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+function poTabHtml(all){
+  var pos = all.filter(function(o){ return o.po; }).sort(function(a,b){ return num(b.po) - num(a.po); });
+  var q = ui.search.trim().toLowerCase();
+  if(q) pos = pos.filter(function(o){ return [o.po, o.supplier, o.ref, o.notes].concat(orderLines(o).map(function(l){ return l.desc || l.text || ""; })).join(" ").toLowerCase().indexOf(q) >= 0; });
+  if(!pos.length) return '<div class="empty">' + (q ? "No purchase orders match." : "No purchase orders yet. They appear here once a quote is approved.") + '</div>';
+  return '<div class="olist">' + pos.map(function(o){
+    return '<div class="ord ' + (o.status === "received" || o.status === "closed" ? "done" : "") + '"><div class="h" data-open="' + esc(o.id) + '" style="cursor:pointer"><b>PO ' + esc(o.po) + ' · ' + esc(o.supplier) + '</b>' + statusPill(o) + '</div>' +
+      '<div class="small muted" data-open="' + esc(o.id) + '" style="cursor:pointer">' + esc(fmtDate(o.poDate || o.orderedDate)) + (o.location ? ' · 📍 ' + esc(o.location) : '') + (o.ref ? ' · quote ' + esc(o.ref) : '') + ' · ' + orderLines(o).length + ' line(s) · approved by ' + esc(o.approvedBy || "—") + (o.poSentAt ? ' · emailed ' + esc(fmtDate(o.poSentAt.slice(0,10))) : '') + '</div>' +
+      '<div class="row" style="margin-top:8px"><button class="btn btn-sm" data-poact="view" data-po="' + esc(o.id) + '">📄 View</button><button class="btn btn-sm" data-poact="print" data-po="' + esc(o.id) + '">🖨 Print</button><button class="btn btn-sm" data-poact="pdf" data-po="' + esc(o.id) + '">⬇ PDF</button><button class="btn btn-sm" data-poact="email" data-po="' + esc(o.id) + '">✉ Email</button><button class="btn btn-sm" data-poact="wa" data-po="' + esc(o.id) + '">WhatsApp</button></div></div>';
+  }).join("") + '</div>';
+}
+async function whatsappPo(o){
+  toast("Making the PDF…", "ok");
+  await savePoPdf(o, false);
+  var lines = orderLines(o).map(function(l, i){ return (i + 1) + ". " + num(l.qty) + " × " + (l.desc || l.text || stockLabel(l)) + (l.size ? " (" + l.size + ")" : ""); });
+  var text = "*Purchase Order PO " + o.po + "* — Oak Joinery (Pty) Ltd\n" + (o.supplier ? "To: " + o.supplier + "\n" : "") + (o.ref ? "Your quote: " + o.ref + "\n" : "") +
+    "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n" + (o.dueDate ? "Delivery date: " + fmtDate(o.dueDate) + "\n" : "") + "\n" +
+    lines.slice(0, 30).join("\n") + (lines.length > 30 ? "\n… and " + (lines.length - 30) + " more" : "") + (o.poUrl ? "\n\nPO (PDF): " + o.poUrl : "") + "\n\nPlease quote PO " + o.po + " on your delivery note and invoice.";
+  window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+}
+function openModal(html){ var m = document.getElementById("modal"); m.innerHTML = '<div class="mbg"><div class="mbox">' + html + '</div></div>'; m.classList.remove("hide"); }
+function closeModal(){ var m = document.getElementById("modal"); m.innerHTML = ""; m.classList.add("hide"); }
+function openPoBook(){
+  if(!user.isRoot) return;
+  var b = poBook() || {}, locs = locationsAll();
+  openModal('<h2>PO numbers</h2>' +
+    (b.to ? '<p class="small muted" style="margin-top:0">Current block <b>' + esc(b.from) + ' – ' + esc(b.to) + '</b> · next number <b>' + esc(b.next) + '</b> · <b>' + poLeft() + '</b> left</p>' : '<p class="small muted" style="margin-top:0">No numbers loaded yet.</p>') +
+    '<label>Load a new block of PO numbers</label><div class="grid2"><div><label>From</label><input id="pbFrom" type="number" placeholder="e.g. 20000"></div><div><label>To</label><input id="pbTo" type="number" placeholder="e.g. 20200"></div></div>' +
+    '<p class="small muted">Loading a new block replaces what\'s left of the current one. The app warns everyone when ' + PO_LOW + ' or fewer are left.</p>' +
+    '<label style="margin-top:14px">Delivery address printed on the PO</label>' + locs.map(function(l, i){ return '<div><label>' + esc(l) + '</label><input data-addr="' + esc(l) + '" value="' + esc(addrFor(l)) + '" placeholder="Street, area, city"></div>'; }).join("") +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    if(!freshUser() || !user.isRoot) return;
+    var from = parseInt(document.getElementById("pbFrom").value, 10), to = parseInt(document.getElementById("pbTo").value, 10);
+    var upd = {}, addrs = {};
+    document.querySelectorAll("[data-addr]").forEach(function(i){ addrs[fbKey(i.getAttribute("data-addr"))] = i.value.trim(); });
+    upd.addresses = addrs;
+    if(!isNaN(from) || !isNaN(to)){
+      if(isNaN(from) || isNaN(to) || to < from){ toast("Enter both numbers, with 'To' bigger than 'From'.", "err"); return; }
+      var used = list(D.orders).some(function(o){ var p = num(o.po); return p >= from && p <= to; });
+      if(used && !confirm("Some numbers in " + from + " – " + to + " have already been used on orders. Load this block anyway? (Used numbers are skipped.)")) return;
+      upd.from = from; upd.to = to; upd.next = from; upd.loadedBy = user.username; upd.loadedAt = new Date().toISOString();
+      var hist = (poBook() && poBook().history) || []; hist = Array.isArray(hist) ? hist : list(hist);
+      hist.push({ from:from, to:to, by:user.username, at:upd.loadedAt }); upd.history = hist;
+    }
+    try{ await db.ref("orders/poBook").update(upd); closeModal(); toast("PO numbers saved.", "ok"); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
+// Take the next free PO number (skipping any already used on an order).
+async function takePoNumber(){
+  var usedSet = {}; list(D.orders).forEach(function(o){ if(o.po) usedSet[o.po] = 1; });
+  var got = null;
+  var res = await db.ref("orders/poBook").transaction(function(b){
+    if(!b || !b.to) return;
+    var n = num(b.next);
+    while(n <= num(b.to) && usedSet[n]) n++;
+    if(n > num(b.to)) return;
+    got = n; b.next = n + 1; return b;
+  });
+  if(!res.committed || got === null) throw new Error("No PO numbers left — " + (user.isRoot ? "load the next block under “PO numbers”." : "ask Sean to load more PO numbers."));
+  return got;
+}
+function approveModal(o){
+  if(!canApprove()){ toast("Only people the main root has allowed can approve orders. Ask Sean.", "err"); return; }
+  var left = poLeft(), b = poBook();
+  if(!b || !b.to || left === 0){ toast(!b || !b.to ? "Load PO numbers first (root: “PO numbers” on the Orders list)." : "PO numbers are used up — they need to be topped up.", "err"); return; }
+  var sup = allSuppliers().find(function(s){ return s.name.toLowerCase() === String(o.supplier||"").toLowerCase(); }) || {};
+  openModal('<h2>' + (o.status === "quote" ? "Approve quote" : "Create purchase order") + '</h2>' +
+    '<p class="small muted" style="margin-top:0">' + esc(o.supplier) + (o.ref ? ' · quote ' + esc(o.ref) : '') + ' · ' + orderLines(o).length + ' line(s)</p>' +
+    '<div class="check" style="margin:8px 0"><div class="small muted">PO number</div><div style="font-family:var(--font-m);font-size:26px;font-weight:600">' + esc(b.next) + '</div><div class="small muted">' + left + ' number' + (left===1?'':'s') + ' left in this block</div></div>' +
+    '<div class="grid2">' + (o.status === "quote" ? '<div><label>Order date</label><input id="aDate" type="date" value="' + today() + '"></div>' : '') +
+    '<div><label>Delivery date (optional)</label><input id="aDue" type="date" value="' + esc(o.dueDate || "") + '"></div></div>' +
+    '<label>Send to (supplier email)</label><input id="aTo" type="email" value="' + esc(o.supplierEmail || sup.email || "") + '" placeholder="sales@supplier.co.za">' +
+    '<label>CC (second email)</label><input id="aCc" type="text" value="' + esc(o.supplierCc || sup.cc || "") + '" placeholder="e.g. accounts@supplier.co.za or someone at Oak">' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">✓ Approve &amp; create PO</button></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("mOk").onclick = async function(){
+    if(!freshUser()) return;
+    var btn = this; btn.disabled = true;
+    try{
+      var po = await takePoNumber();
+      var upd = { po:po, poDate:today(), approvedBy:user.username, approvedAt:new Date().toISOString(),
+        supplierEmail: document.getElementById("aTo").value.trim(), supplierCc: document.getElementById("aCc").value.trim(),
+        dueDate: document.getElementById("aDue").value || o.dueDate || null };
+      if(o.status === "quote"){ upd.status = "ordered"; upd.orderedDate = (document.getElementById("aDate") || {}).value || today(); }
+      await db.ref("orders/list/" + o.id).update(upd);
+      Object.assign(D.orders[o.id], upd);
+      closeModal(); toast("Approved — PO " + po + " created.", "ok");
+      ui.view = "po"; ui.orderId = o.id; render(); window.scrollTo(0, 0);
+    }catch(e){ btn.disabled = false; toast(e.message || String(e), "err"); }
+  };
+}
+function poDocHtml(o){
+  var lines = orderLines(o), PER = 16, pages = [];
+  for(var i = 0; i < Math.max(lines.length, 1); i += PER) pages.push(lines.slice(i, i + PER));
+  var head = function(){ return '<div class="po-lh"><div><div class="po-name">Oak Joinery (Pty) Ltd</div><div class="po-addr">16 Bowling Avenue, Kramerville, Johannesburg</div><div class="po-reg">VAT No: 4390291278<br>Reg No: 2022/532088/07</div></div><div class="po-div"></div><div class="po-logo"><span>OAK</span><small>JOINERY</small></div></div>' +
+    '<div class="po-head"><div><h3>Purchase order</h3><div class="po-num">PO ' + esc(o.po) + '</div></div><div class="po-date"><span>Date</span><b>' + esc(fmtDate(o.poDate || o.orderedDate || today())) + '</b></div></div>' +
+    '<div class="po-rows"><div><span>To:</span><b>' + esc(o.supplier) + '</b></div>' + (o.supplierEmail ? '<div><span></span><span>' + esc(o.supplierEmail) + '</span></div>' : '') +
+    (o.ref ? '<div><span>Your quote:</span><span>' + esc(o.ref) + '</span></div>' : '') +
+    '<div><span>Deliver to:</span><span>Oak Joinery — ' + esc(o.location || "") + (addrFor(o.location) ? ', ' + esc(addrFor(o.location)) : '') + '</span></div>' +
+    (o.dueDate ? '<div><span>Delivery date:</span><span>' + esc(fmtDate(o.dueDate)) + '</span></div>' : '') + '</div>'; };
+  var foot = function(n){ return '<div class="po-bottom">' + (o.notes ? '<div class="po-notes"><b>Notes:</b> ' + esc(o.notes) + '</div>' : '') +
+    '<div class="po-quote">Please quote <b>PO ' + esc(o.po) + '</b> on your delivery note and invoice.</div>' +
+    '<div class="po-sign"><div><div class="po-line"></div><div class="po-lab">Authorised by: <b>' + esc(o.approvedBy || user.username) + '</b></div><div class="po-when">' + esc(fmtDate(o.poDate || today())) + '</div></div><div></div></div>' +
+    '<div class="po-foot"><span>PO ' + esc(o.po) + '</span><span>Page ' + n + ' of ' + pages.length + '</span></div></div>'; };
+  return '<div id="poDoc">' + pages.map(function(pl, pi){
+    return '<div class="po-page">' + head() + '<table class="po-items"><thead><tr><th>#</th><th class="n">Qty</th><th>Unit</th><th>Description</th></tr></thead><tbody>' +
+      pl.map(function(l, k){ var idx = pi * PER + k + 1; var unit = unitOf(l) || ""; if(/^Not /.test(unit)) unit = "";
+        return '<tr><td>' + idx + '</td><td class="n"><b>' + num(l.qty) + '</b></td><td>' + esc(unit.replace(/ \(single\)/, "")) + '</td><td>' + esc(l.desc || l.text || stockLabel(l)) + (l.size ? ' <span class="po-size">' + esc(l.size) + '</span>' : '') + (l.code ? ' <span class="po-size">(' + esc(l.code) + ')</span>' : '') + '</td></tr>'; }).join("") +
+      '</tbody></table>' + foot(pi + 1) + '</div>'; }).join("") + '</div>';
+}
+function viewPo(o){
+  return '<button class="backlink" id="back">' + (ui.poFrom === "list" ? '← All purchase orders' : '← Back to the order') + '</button>' +
+    '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="poEmail">✉ Email to supplier</button><button class="btn" id="poPrint">🖨 Print</button><button class="btn" id="poPdf">⬇ Save PDF</button><button class="btn" id="poWa">WhatsApp</button></div>' +
+    '<p class="small muted" style="margin:-4px 0 12px">To: <b>' + esc(o.supplierEmail || "no email saved") + '</b>' + (o.supplierCc ? ' · CC: <b>' + esc(o.supplierCc) + '</b>' : '') + (o.poSentAt ? ' · last emailed ' + esc(new Date(o.poSentAt).toLocaleString("en-ZA")) : '') + '</p>' +
+    '<div class="po-wrap">' + poDocHtml(o) + '</div>';
+}
+async function poPdfBlob(){
+  if(!window.html2canvas) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+  if(!window.jspdf) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  var doc = document.getElementById("poDoc"); doc.classList.add("pdf-mode");
+  try{
+    var pdf = new window.jspdf.jsPDF({ unit:"mm", format:"a4", orientation:"portrait" });
+    var pages = doc.querySelectorAll(".po-page");
+    for(var i = 0; i < pages.length; i++){
+      var c = await html2canvas(pages[i], { backgroundColor:"#ffffff", scale:2, useCORS:true });
+      if(i) pdf.addPage("a4", "portrait");
+      pdf.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, 297);
+    }
+    return pdf.output("blob");
+  } finally { doc.classList.remove("pdf-mode"); }
+}
+async function savePoPdf(o, download){
+  var blob = await poPdfBlob(), name = "PO " + o.po + " - " + String(o.supplier || "").replace(/[\\/:*?"<>|]+/g, "") + ".pdf";
+  if(download){ var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
+  try{
+    if(firebase.storage){ var ref = firebase.storage().ref("purchaseOrders/" + name.replace(/[^\w.\- ]+/g, "_")); await ref.put(blob, { contentType:"application/pdf" }); var url = await ref.getDownloadURL();
+      await db.ref("orders/list/" + o.id).update({ poUrl:url }); o.poUrl = url; }
+  }catch(e){ console.warn("PO upload", e); }
+  return name;
+}
+async function emailPo(o){
+  if(!canApprove()){ toast("Only people allowed to approve orders can send purchase orders.", "err"); return; }
+  if(!o.supplierEmail){ toast("No supplier email saved — edit the order and add one first.", "err"); return; }
+  toast("Making the PDF…", "ok");
+  var name = await savePoPdf(o, true);
+  var lines = orderLines(o).map(function(l, i){ return (i + 1) + ". " + num(l.qty) + " × " + (l.desc || l.text || stockLabel(l)) + (l.size ? " (" + l.size + ")" : ""); });
+  var sup = allSuppliers().find(function(s){ return s.name.toLowerCase() === String(o.supplier||"").toLowerCase(); }) || {};
+  var body = "Good day" + (sup.contact ? " " + sup.contact : "") + ",\n\nPlease find attached our purchase order PO " + o.po + (o.ref ? " for your quote " + o.ref : "") + ".\n\n" +
+    lines.slice(0, 25).join("\n") + (lines.length > 25 ? "\n… and " + (lines.length - 25) + " more (see the PO)" : "") + "\n\n" +
+    "Deliver to: Oak Joinery — " + (o.location || "") + (addrFor(o.location) ? ", " + addrFor(o.location) : "") + "\n" +
+    (o.dueDate ? "Delivery date: " + fmtDate(o.dueDate) + "\n" : "") +
+    (o.poUrl ? "\nPO (PDF): " + o.poUrl + "\n" : "") +
+    "\nPlease quote PO " + o.po + " on your delivery note and invoice.\n\nKind regards,\n" + user.username + "\nOak Joinery (Pty) Ltd";
+  var href = "mailto:" + encodeURIComponent(o.supplierEmail).replace(/%40/g, "@") + "?" + (o.supplierCc ? "cc=" + encodeURIComponent(o.supplierCc).replace(/%40/g, "@").replace(/%2C/gi, ",") + "&" : "") +
+    "subject=" + encodeURIComponent("Purchase Order PO " + o.po + " — Oak Joinery") + "&body=" + encodeURIComponent(body);
+  await db.ref("orders/list/" + o.id).update({ poSentAt:new Date().toISOString(), poSentBy:user.username });
+  window.location.href = href;
+  toast("Email opened — attach " + name + " from your Downloads if it isn't attached.", "ok");
+}
+
 // ---------- events ----------
 function editOrder(o){
-  draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
+  draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", supplierCc:o.supplierCc||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
     location:o.location || locationsAll()[0], notes:o.notes||"", dueDate:o.dueDate||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
     lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), stock:l.stock||"", nf:l.nf||null, per:l.per||"", how:"picked", score:1 }; }) }
     : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:ui.loc || locationsAll()[0], notes:"", file:null, lines:[] };
@@ -1269,6 +1519,7 @@ function readDraftFields(){
   if(!draft) return;
   if(g("dSup") !== undefined) draft.supplier = g("dSup");
   if(g("dEmail") !== undefined) draft.supplierEmail = g("dEmail").trim();
+  if(g("dCc") !== undefined) draft.supplierCc = g("dCc").trim();
   if(g("dRef") !== undefined) draft.ref = g("dRef").trim();
   if(g("dQDate") !== undefined) draft.quoteDate = g("dQDate");
   if(g("dODate") !== undefined) draft.orderedDate = g("dODate");
@@ -1300,18 +1551,37 @@ function bind(){
     draft = null; rcv = null; ui.view = backTo; render();
   };
   // list
-  if(q("#newOrder")) q("#newOrder").onclick = function(){ editOrder(null); };
+  if(q("#newOrder")) q("#newOrder").onclick = function(){ if(!canQuote()){ toast("You don't have permission to add quotes — ask Sean.", "err"); return; } editOrder(null); };
   if(q("#rcvAny")) q("#rcvAny").onclick = function(){ startReceive("", null); };
+  if(q("#poBookBtn")) q("#poBookBtn").onclick = openPoBook;
+  if(q("#apprBtn")) q("#apprBtn").onclick = openApprovers;
+  qa("[data-poact]").forEach(function(b){ b.onclick = function(e){ e.stopPropagation(); ui.orderId = b.getAttribute("data-po"); ui.poAction = b.getAttribute("data-poact"); ui.view = "po"; ui.poFrom = "list"; render(); window.scrollTo(0, 0); }; });
   if(q("#addLoc")) q("#addLoc").onclick = async function(){ var n = await addLocationFlow(); if(n){ setLoc(n); render(); } };
   qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
   qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
   if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
   qa("[data-open]").forEach(function(c){ c.onclick = function(){ ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
+  // purchase order page
+  if(ui.view === "po" && D.orders[ui.orderId]){
+    var po = D.orders[ui.orderId]; po.id = ui.orderId;
+    if(q("#back")) q("#back").onclick = function(){ ui.view = ui.poFrom === "list" ? "list" : "order"; ui.poFrom = null; render(); };
+    if(q("#poWa")) q("#poWa").onclick = async function(){ this.disabled = true; try{ await whatsappPo(po); }catch(e){ toast("Couldn't prepare WhatsApp: " + (e.message || e), "err"); } this.disabled = false; };
+    var act = ui.poAction; ui.poAction = null;
+    if(act === "print") setTimeout(function(){ window.print(); }, 300);
+    else if(act === "pdf") setTimeout(function(){ q("#poPdf") && q("#poPdf").click(); }, 300);
+    else if(act === "email") setTimeout(function(){ q("#poEmail") && q("#poEmail").click(); }, 300);
+    else if(act === "wa") setTimeout(function(){ q("#poWa") && q("#poWa").click(); }, 300);
+    if(q("#poPrint")) q("#poPrint").onclick = function(){ window.print(); };
+    if(q("#poPdf")) q("#poPdf").onclick = async function(){ this.disabled = true; try{ var n = await savePoPdf(po, true); toast("Saved " + n + ".", "ok"); }catch(e){ toast("Couldn't make the PDF: " + (e.message || e), "err"); } this.disabled = false; };
+    if(q("#poEmail")) q("#poEmail").onclick = async function(){ this.disabled = true; try{ await emailPo(po); }catch(e){ toast("Couldn't prepare the email: " + (e.message || e), "err"); } this.disabled = false; };
+    return;
+  }
   // order detail
   var o = ui.view === "order" ? D.orders[ui.orderId] : null;
   if(o){
     o.id = ui.orderId;
-    if(q("#placeOrder")) q("#placeOrder").onclick = function(){ var d = (q("#placeDate") || {}).value || today(); setStatus2(o, "ordered", { orderedDate:d }); };
+    if(q("#approveQ")) q("#approveQ").onclick = function(){ approveModal(o); };
+    if(q("#openPo")) q("#openPo").onclick = function(){ ui.view = "po"; render(); window.scrollTo(0, 0); };
     if(q("#rcvThis")) q("#rcvThis").onclick = function(){ startReceive(o.supplier, o.id); };
     if(q("#dueSet")) q("#dueSet").onchange = function(){ setStatus2(o, o.status, { dueDate: this.value || null }); };
     if(q("#editOrder")) q("#editOrder").onclick = function(){ editOrder(o); };
@@ -1322,12 +1592,12 @@ function bind(){
   }
   // edit
   if(ui.view === "edit" && draft){
-    ["dSup","dEmail","dRef","dQDate","dODate","dDue","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
+    ["dSup","dEmail","dCc","dRef","dQDate","dODate","dDue","dLoc","dNotes"].forEach(function(id){ var e = q("#" + id); if(e) e.onchange = e.oninput = readDraftFields; });
     if(q("#dLoc")) q("#dLoc").onchange = async function(){
       if(this.value !== "__add"){ readDraftFields(); return; }
       var keep = draft.location; readDraftFields(); draft.location = keep;
       var n = await addLocationFlow(); if(n) draft.location = n; render(); };
-    if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; } render(); };
+    if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; } if(s && s.cc && !draft.supplierCc){ draft.supplierCc = s.cc; } render(); };
     qa("[data-supto]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.newSupTo = b.getAttribute("data-supto"); render(); }; });
     qa("[data-st]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.status = b.getAttribute("data-st"); render(); }; });
     bindFileInputs(function(f){ readDraftFields(); draft.file = f; readInto(f, function(raw){ var said = applyDraftDoc(); addDraftLines(raw, "file"); if(said.length) setTimeout(function(){ toast("Read " + said.join(" and ") + " from the document.", "ok"); }, 1800); }); });
@@ -1384,6 +1654,7 @@ function start(){
     db.ref("consumablesStock/" + k).on("value", function(s){ D.cons[{ screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]] = s.val() || {}; rr(); });
   });
   db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
+  db.ref("orders/poBook").on("value", function(s){ D.poBook = s.val() || null; if(ui.view === "list" || ui.view === "order") rr(); });
   db.ref("orders/list").on("value", function(s){ D.orders = s.val() || {}; D.loaded = true;
     // don't redraw under someone typing in a form
     if(ui.view === "list" || ui.view === "order") rr(); });
