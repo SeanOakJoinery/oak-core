@@ -141,6 +141,20 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 
   var view = "boot", pickId = null, err = "", busy = false, user = null;
+  // Terms & conditions (2026-10-01): everyone agrees once per version; recorded in terms/accepted/<user id>.
+  var TERMS_VERSION = "2026-10-01", termsAcc = null, termsBusy = false;
+  function termsOk(u){
+    if(!u) return false;
+    var r = termsAcc && termsAcc[u.id];
+    if(r && r.version === TERMS_VERSION) return true;
+    return load("oakTerms_" + u.id) === TERMS_VERSION;
+  }
+  // after login: terms first (if not agreed yet), then the app they came for, else the menu
+  function afterLogin(){
+    if(!termsOk(user)){ view = "terms"; return false; }
+    view = "home";
+    return goNext();
+  }
   var fails = 0, lockedUntil = 0; var autoSeq = 0;
 
   function findUser(id){ return core.getUsers().find(function(u){ return u && u.id === id; }) || null; }
@@ -150,8 +164,8 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   function restore(){
     var r = S.resolve(core.getUsers());
     if(r.status !== "ok") return false;
-    user = r.user; view = "home";
-    goNext();
+    user = r.user;
+    afterLogin();
     return true;
   }
   // Came here from an app (?next=stock): go straight back once logged in.
@@ -178,14 +192,25 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
         if(fails >= 5){ lockedUntil = Date.now() + 30000; fails = 0; throw new Error("Too many wrong PINs. Wait 30 seconds."); }
         throw new Error("Incorrect PIN.");
       }
-      fails = 0; user = u; view = "home";
+      fails = 0; user = u;
       S.set(u);
       store(LAST_KEY, u.id);
-      if(goNext()){ busy = false; return; }
+      if(afterLogin()){ busy = false; return; }
     }catch(e){ err = e && e.message ? e.message : "Login failed."; }
     busy = false; render();
   }
 
+  async function agreeTerms(){
+    if(termsBusy || !user) return;
+    termsBusy = true; err = ""; render();
+    var rec = { version:TERMS_VERSION, at:new Date().toISOString(), username:user.username };
+    store("oakTerms_" + user.id, TERMS_VERSION);
+    try{ await firebase.database().ref("terms/accepted/" + user.id).set(rec); }
+    catch(e){ console.warn("terms save", e); }   // still let them in; it's kept on this phone and retried next time
+    termsBusy = false;
+    if(termsAcc) termsAcc[user.id] = rec;
+    view = "home"; if(goNext()) return; render();
+  }
   function logout(){ S.clear(); notice = ""; user = null; pickId = null; err = ""; view = "pick"; render(); }
 
   function render(keepPin){
@@ -241,6 +266,24 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
       return;
     }
 
+    if(view === "terms" && user){
+      if(termsOk(user)){ view = "home"; if(goNext()) return; render(); return; }
+      root.innerHTML = '<div class="card"><h2>Terms &amp; conditions</h2>' +
+        '<p class="small" style="line-height:1.6">Hi ' + esc(user.username) + '. Before you carry on, please read and agree to the terms of use.</p>' +
+        '<div style="border:1px solid var(--amber);border-radius:10px;padding:12px;margin:10px 0;font-size:14px;line-height:1.6">' +
+          'The Oak Joinery Apps were <b>created by Sean Warren and are owned by Sean Warren</b>. Oak Joinery (Pty) Ltd is given the right to use them for its own business. ' +
+          'Don\'t copy, share or change the apps without Sean\'s written permission. Keep your PIN private and use the apps for company work only.</div>' +
+        '<p class="small"><a href="terms/" target="_blank" rel="noopener" style="color:var(--amber)">Read the full terms &amp; conditions</a></p>' +
+        '<label class="small" style="display:flex;gap:10px;align-items:center;margin:14px 0;color:var(--text)"><input type="checkbox" id="tAgree" style="width:20px;height:20px;accent-color:var(--amber)"> I have read and agree to the terms &amp; conditions</label>' +
+        '<p class="err">' + esc(err) + '</p>' +
+        '<div class="actions"><button class="btn" id="tOut" type="button">Log out</button><button class="btn btn-primary" id="tOk" type="button" disabled>' + (termsBusy ? "Saving…" : "I agree") + '</button></div></div>';
+      var cb = document.getElementById("tAgree"), ok = document.getElementById("tOk");
+      cb.addEventListener("change", function(){ ok.disabled = !cb.checked || termsBusy; });
+      document.getElementById("tOut").addEventListener("click", logout);
+      ok.addEventListener("click", agreeTerms);
+      return;
+    }
+
     if(view === "home" && user){
       var apps = allowedApps(user);
       var hr = new Date().getHours();
@@ -257,7 +300,7 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
         });
         h += '</div>';
       }
-      h += '<div class="foot"><span>oak-core ' + esc(OakCore.VERSION) + '</span><button class="link" id="out" type="button">Log out</button></div>';
+      h += '<div class="foot"><span>oak-core ' + esc(OakCore.VERSION) + ' · <a href="terms/" style="color:inherit">Terms &amp; conditions</a></span><button class="link" id="out" type="button">Log out</button></div>';
       root.innerHTML = h;
       document.getElementById("out").addEventListener("click", logout);
     }
@@ -267,7 +310,7 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   function onUsers(){
     if(view === "boot"){ if(!restore()) view = "pick"; render(); return; }
     if(view === "pick") { render(); return; }
-    if(view === "home" && user){
+    if((view === "home" || view === "terms") && user){
       var fresh = findUser(user.id);
       if(!fresh || S.resolve(core.getUsers()).status !== "ok"){ logout(); return; }
       user = fresh; render();
@@ -285,6 +328,13 @@ input[type=password]:focus{outline:none;border-color:var(--amber)}
   try{
     core.init();
     core.startUsersSync(onUsers);
+    firebase.database().ref("terms/accepted").on("value", function(s){
+      termsAcc = s.val() || {};
+      // agreed on this phone but the save didn't reach the database: send it again
+      if(user && load("oakTerms_" + user.id) === TERMS_VERSION && !(termsAcc[user.id] && termsAcc[user.id].version === TERMS_VERSION))
+        firebase.database().ref("terms/accepted/" + user.id).set({ version:TERMS_VERSION, at:new Date().toISOString(), username:user.username }).catch(function(){});
+      if(view === "terms") render();
+    }, function(){ termsAcc = termsAcc || {}; });
     setTimeout(function(){ if(view === "boot"){ view = "pick"; render(); } }, 8000);
   }catch(e){
     document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="err">' + esc(e.message || String(e)) + '</p></div>';
