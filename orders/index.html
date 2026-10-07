@@ -647,7 +647,7 @@ var L = StockInLib, S = OakCore.session, esc = OakCore.esc;
 var core = OakCore.createApp({ appId: "orders", readOnly: true });
 var db = null;
 
-var UNITS = { per500:"pack(s)", each:"each", pair:"pair(s)", roll:"roll(s)", tin:"tin(s)" };
+var UNITS = { per500:"pack(s)", each:"each", pair:"pair(s)", roll:"roll(s)", tin:"tin(s)", litre:"litres (L)" };
 var LATE_DAYS = 7;
 function perm(u, p){ return !!(u && (u.isRoot || (u.permissions && u.permissions[p]))); }
 function canBoard(u){ return core.userHasApp(u, "boardStock") && perm(u, "boardAddQty"); }
@@ -724,13 +724,29 @@ function packSizeOf(line){
   var it = D.cons.items[stock.slice(4)]; if(!it || (it.unit && it.unit !== "per500")) return 0;
   return parseInt(it.bundleSize) || 500;
 }
+// Tins (stains, lacquers, thinners) — same sizes as the Consumables app. Stock is kept in tins;
+// an order line can be in tins or in litres ("12.5 L of hardener" = 12.5 one-litre tins).
+var TIN_SIZES = ["250 ml", "500 ml", "1 L", "5 L", "20 L", "25 L"];
+function litresOf(size){ var m = String(size || "").replace(",", ".").match(/([\d.]+)\s*(ml|l)\b/i); if(!m) return 0; var v = parseFloat(m[1]); return /ml/i.test(m[2]) ? v / 1000 : v; }
+function tinSizeOf(line){
+  var stock = line && line.stock;
+  if(stock === "new:cons") return (line.nf && line.nf.unit === "tin") ? (line.nf.tinsize || "") : "";
+  if(!stock || stock.indexOf("c:s:") !== 0) return "";
+  var it = D.cons.items[stock.slice(4)]; return it && it.unit === "tin" ? (it.packSize || "") : "";
+}
+function isTin(line){ var st = line && line.stock; if(st === "new:cons") return !!(line.nf && line.nf.unit === "tin"); if(!st || st.indexOf("c:s:") !== 0) return false; var it = D.cons.items[st.slice(4)]; return !!(it && it.unit === "tin"); }
+function guessTinSize(text){ var m = String(text || "").match(/(\d+(?:[.,]\d+)?)\s*(LT|LTR|LITRE|L|ML)\b/i); if(!m) return ""; var v = m[1].replace(",", "."), ml = /^ml$/i.test(m[2]); var c = ml ? v + " ml" : v + " L"; return TIN_SIZES.indexOf(c) >= 0 ? c : ""; }
 function guessPer(line){
+  if(isTin(line)) return "tin";
   var ps = packSizeOf(line); if(!ps) return "";
   return (/\b(each|ea)\b/i.test(line.text || "") || num(line.qty) >= ps) ? "each" : "pack";
 }
 // qty in the stock app's own unit (packs), from an order qty
-function toStockQty(line, qty){ var ps = packSizeOf(line); return ps && line.per === "each" ? Math.round(qty / ps * 1e6) / 1e6 : qty; }
+function toStockQty(line, qty){
+  if(isTin(line)){ var L1 = litresOf(tinSizeOf(line)); return line.per === "litre" && L1 ? Math.round(qty / L1 * 1e6) / 1e6 : qty; }
+  var ps = packSizeOf(line); return ps && line.per === "each" ? Math.round(qty / ps * 1e6) / 1e6 : qty; }
 function unitOf(line){
+  if(isTin(line)){ var ts = tinSizeOf(line); return line.per === "litre" ? "litres" : "tin(s)" + (ts ? " of " + ts : ""); }
   if(packSizeOf(line)) return line.per === "each" ? "each (single)" : "pack(s) of " + packSizeOf(line);
   if(line.stock === "new:board") return "EA";
   if(line.stock === "new:cons") return UNITS[(line.nf||{}).unit] || "each";
@@ -1101,7 +1117,8 @@ function newFieldsHtml(l){
   if(l.stock === "new:board") return '<div class="newf">' + f("description","Board name",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + '</div>';
   if(l.stock === "new:cons") return '<div class="newf">' + f("name","Name",n.name,"4x30 chipboard screw") +
     '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div>' +
-    (n.unit === "per500" ? f("bundle","Items per pack",n.bundle || "500","500") : '') + '</div>';
+    (n.unit === "per500" ? f("bundle","Items per pack",n.bundle || "500","500") : '') +
+    (n.unit === "tin" ? '<div><label>Tin size</label><select data-nf="' + k + '" data-f="tinsize"><option value="">— pick —</option>' + TIN_SIZES.map(function(z){ return '<option' + (n.tinsize===z?" selected":"") + '>' + z + '</option>'; }).join("") + '</select></div>' : '') + '</div>';
   return "";
 }
 function lineCls(l){ if(!l.stock) return "check"; if(l.stock === "none") return "skip"; if(l.stock.indexOf("new:") === 0) return "new"; return (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok"; }
@@ -1132,7 +1149,8 @@ function viewEdit(){
     d.lines.forEach(function(l){
       h += '<div class="line ' + lineCls(l) + '">' + (l.text ? '<div class="src">' + esc(l.text) + '</div>' + (l.size ? '<div class="small" style="margin:-2px 0 6px"><b>' + esc(l.desc || "") + '</b> · size ' + esc(l.size) + '</div>' : '') : '<div class="newf" style="grid-template-columns:1fr;margin:0 0 8px"><div><label>Description</label><input data-text="' + l.key + '" value="' + esc(l.desc||"") + '" placeholder="What was ordered"></div></div>') +
         '<div class="lrow"><select data-stock="' + l.key + '">' + stockOptions(l.stock) + '</select>' +
-        '<div><input type="number" inputmode="decimal" min="0" step="any" data-qty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty">' + (packSizeOf(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="pack"' + (l.per!=="each"?" selected":"") + '>packs (' + packSizeOf(l) + ')</option><option value="each"' + (l.per==="each"?" selected":"") + '>each</option></select>' : '<div class="unit">' + esc(unitOf(l)) + '</div>') + (num(l.received) ? '<div class="unit">' + l.received + ' in</div>' : '') + '</div>' +
+        '<div><input type="number" inputmode="decimal" min="0" step="any" data-qty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty">' + (isTin(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="tin"' + (l.per!=="litre"?" selected":"") + '>tins' + (tinSizeOf(l) ? ' (' + esc(tinSizeOf(l)) + ')' : '') + '</option><option value="litre"' + (l.per==="litre"?" selected":"") + '>litres</option></select>' :
+          packSizeOf(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="pack"' + (l.per!=="each"?" selected":"") + '>packs (' + packSizeOf(l) + ')</option><option value="each"' + (l.per==="each"?" selected":"") + '>each</option></select>' : '<div class="unit">' + esc(unitOf(l)) + '</div>') + (num(l.received) ? '<div class="unit">' + l.received + ' in</div>' : '') + '</div>' +
         '<button class="x" type="button" title="Remove line" data-del="' + l.key + '">×</button></div>' +
         '<div class="prow"><label>Unit price excl. VAT</label><span class="rprefix">R</span><input type="number" inputmode="decimal" min="0" step="0.01" data-price="' + l.key + '" value="' + (l.price === "" || l.price == null ? "" : esc(l.price)) + '" placeholder="0.00"><span class="amt" data-amt="' + l.key + '">' + (num(l.price) ? "= " + money(lineAmt(l)) : "") + '</span></div>' +
         newFieldsHtml(l) + '</div>';
@@ -1337,6 +1355,7 @@ async function saveDraft(){
   for(var i = 0; i < lines.length; i++){ var l = lines[i];
     if(l.stock === "new:board" && !(l.nf && l.nf.description)) { toast("Give the new board a name.", "err"); return; }
     if(l.stock === "new:cons" && !(l.nf && l.nf.name)) { toast("Give the new consumable a name.", "err"); return; }
+    if(l.stock === "new:cons" && l.nf.unit === "tin" && !l.nf.tinsize) { toast("Pick the tin size for " + l.nf.name + ".", "err"); return; }
     if(!l.text && !l.desc && !l.stock){ toast("A hand-typed line needs a description or a stock item.", "err"); return; }
   }
   if(isNewSupplier(d.supplier) && !d.newSupTo){ toast(d.supplier + " is a new supplier — choose which app to add it to (top of the page).", "err"); window.scrollTo(0, 0); return; }
@@ -1356,7 +1375,7 @@ async function saveDraft(){
     o.lines = {};
     lines.forEach(function(l, n){
       var lid = l.lid || uid() + n, st = stockById(l.stock);
-      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 100) / 100 : null };
+      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 100) / 100 : null };
       if(l.nf && l.stock && l.stock.indexOf("new:") === 0) o.lines[lid].nf = l.nf;
     });
     if(o.status === "part" && orderOut(o) === 0) o.status = "received";
@@ -1415,11 +1434,18 @@ async function addCons(items, loc){
   var base = "consumablesStock/";
   for(var i = 0; i < items.length; i++){
     var x = items[i], q = x.sq;
+    // new liquid counted per litre (e.g. 12.5 L hardener) → a Consumables liquid, stock kept in ml
+    if(x.stock === "new:cons" && x.nf && x.nf.unit === "litre"){
+      var lid2 = uid(), vb = {}; vb[fbKey(loc)] = Math.round(q * 1000);
+      await db.ref(base + "consumableTypes/" + lid2).set({ name:x.nf.name, category:"liquid", reorderLevelMl:0, reorderSent:false, supplierId:"", volumeByLocation:vb });
+      x.newStock = "c:l:" + lid2; continue;
+    }
     if(x.stock === "new:cons"){
       var nid = uid(), qb = {};
       var rec = { size:x.nf.name, unit:x.nf.unit||"each", qtyByLocation:qb, reorderQty:0, reorderSent:false, supplierId:"" };
       if(rec.unit === "per500") rec.bundleSize = parseInt(x.nf.bundle) || 500;
-      qb[loc] = rec.unit === "per500" ? q : Math.round(q);
+      if(rec.unit === "tin" && x.nf.tinsize){ rec.packSize = x.nf.tinsize; rec.category = rec.category || "Tins"; }
+      qb[loc] = (rec.unit === "per500" || rec.unit === "tin") ? Math.round(q * 1000) / 1000 : Math.round(q);
       await db.ref(base + "screwItems/" + nid).set(rec);
       x.newStock = "c:s:" + nid; continue;
     }
@@ -1980,7 +2006,7 @@ function bind(){
       if(l.stock === "new:cons" && !l.nf) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), unit:"each" };
       l.per = guessPer(l);
       render(); }; });
-    qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; }; });
+    qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; readDraftFields(); render(); }; });
     qa("[data-qty]").forEach(function(inp){ inp.oninput = function(){ draftLine(inp.getAttribute("data-qty")).qty = num(inp.value); }; inp.onchange = function(){ readDraftFields(); render(); }; });
     qa("[data-price]").forEach(function(inp){ inp.oninput = function(){ var l = draftLine(inp.getAttribute("data-price")); l.price = inp.value === "" ? "" : num(inp.value);
       var a = document.querySelector('[data-amt="' + l.key + '"]'); if(a) a.textContent = num(l.price) ? "= " + money(lineAmt(l)) : "";
@@ -1989,7 +2015,9 @@ function bind(){
     qa("[data-text]").forEach(function(inp){ inp.oninput = function(){ draftLine(inp.getAttribute("data-text")).desc = inp.value; }; });
     qa("[data-del]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.lines = draft.lines.filter(function(l){ return String(l.key) !== b.getAttribute("data-del"); }); render(); }; });
     qa("[data-nf]").forEach(function(inp){ var h = function(){ var l = draftLine(inp.getAttribute("data-nf")); l.nf = l.nf || {}; l.nf[inp.getAttribute("data-f")] = inp.value.trim(); return l; }; inp.oninput = h;
-      inp.onchange = function(){ var l = h(); if(inp.tagName === "SELECT" || inp.getAttribute("data-f") === "bundle"){ if(!l.per) l.per = guessPer(l); readDraftFields(); render(); } }; });
+      inp.onchange = function(){ var l = h();
+        if(inp.getAttribute("data-f") === "unit"){ if(l.nf.unit === "tin"){ if(!l.nf.tinsize) l.nf.tinsize = guessTinSize(l.text || l.desc); l.per = "tin"; } else if(l.per === "tin" || l.per === "litre") l.per = ""; }
+        if(inp.tagName === "SELECT" || inp.getAttribute("data-f") === "bundle"){ if(!l.per) l.per = guessPer(l); readDraftFields(); render(); } }; });
   }
   // receive
   if(ui.view === "receive" && rcv){
