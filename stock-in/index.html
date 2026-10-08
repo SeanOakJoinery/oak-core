@@ -283,9 +283,16 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
       var code = /[a-z]/i.test(clean) && /\d/.test(clean) && clean.length >= 3 && clean.length <= 20 && !/^\d+(mm|m|l|ml|kg|g)$/i.test(clean) && !/^\d+x\d+/i.test(clean) && !/^x\d/i.test(clean) && clean.indexOf('"') < 0 && !/^\d+\/\d+/.test(clean);
       return { t: t, clean: clean, i: i, plainInt: plainInt && !money, strictInt: /^\d{1,5}$/.test(clean) && !money, price: price || money, code: code, alpha: /^[a-z][a-z&'/-]*$/i.test(clean) };
     });
-    var qtyIdx = -1, ocrQty = false;
+    var qtyIdx = -1, ocrQty = false, dropIdx = -1;
     // "... x 8" or "qty 8" at the end of the line
     var L = info.length;
+    // Delivery notes with "Ordered  Quantity Supplied" columns: "POLIFOND 31 PU SEALER 25LT  1.000  1.000"
+    // — quantities printed with 3 decimals at the end; the last one is what was supplied (2026-10-08).
+    var Q3 = /^\d{1,6}\.\d{3}$/;
+    if (L > 2 && Q3.test(info[L - 1].clean)) {
+      if (Q3.test(info[L - 2].clean)) { qtyIdx = L - 1; dropIdx = L - 2; }
+      else if (!info.some(function (x) { return x.price; })) qtyIdx = L - 1;
+    }
     // Invoice / quote tables: "… DESCRIPTION 5 Each 564.00 …" — the number just before the unit word is the qty.
     var UNITQ = /^(ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|ltr|kg|lengths?|bags?|sets?|tins?|tubes?|cartons?)$/i;
     for (var u = L - 1; u >= 2 && qtyIdx < 0; u--) {
@@ -335,7 +342,7 @@ textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font
     var lead = null;
     if (qtyIdx > 1 && /^\d{1,10}$/.test(info[0].clean)) { lead = info[0]; if (info[0].clean.length >= 3) codeTok = info[0]; }
     var descEnd = qtyIdx === 0 ? info.length : qtyIdx;
-    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
+    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && x.i !== dropIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
       .filter(function (x) { return !lead || x.i !== lead.i; })
       .map(function (x) { return x.t; }).join(" ").replace(/\s+/g, " ").trim();
     // Drop trailing unit words ("EA", "each") from the description
