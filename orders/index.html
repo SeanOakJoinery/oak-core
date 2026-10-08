@@ -829,14 +829,15 @@ function matchStock(src, codeUnique){
 
 // ---------- suppliers ----------
 var SUP_FIELDS = ["contact","title","tel","cell","fax","email","cc","address","website","cardUrl","notes"];
-// Sophie is always CC'd on purchase orders (2026-09-30). Extra CC addresses go next to her.
-var MAIN_CC = { name:"Sophie Radford", email:"sophie@oakjoinery.co.za" };
+// Sophie (2026-09-30) and Cameron (2026-10-08) are always CC'd on purchase order emails. Extra CC addresses go next to them.
+var MAIN_CCS = [{ name:"Sophie Radford", email:"sophie@oakjoinery.co.za" }, { name:"Cameron", email:"cameron@oakjoinery.co.za" }];
+function isMainCc(e){ e = String(e || "").toLowerCase(); return MAIN_CCS.some(function(m){ return m.email === e; }); }
 function extraCc(v){ return String(v || "").split(/[,;\s]+/).map(function(e){ return e.trim().replace(/^<|>$/g, ""); })
-  .filter(function(e){ return /@/.test(e) && e.toLowerCase() !== MAIN_CC.email; })
+  .filter(function(e){ return /@/.test(e) && !isMainCc(e); })
   .filter(function(e, i, a){ return a.map(function(x){ return x.toLowerCase(); }).indexOf(e.toLowerCase()) === i; }).join(", "); }
-function allCc(o){ return [MAIN_CC.email].concat(extraCc(o && o.supplierCc).split(", ").filter(Boolean)); }
+function allCc(o){ return MAIN_CCS.map(function(m){ return m.email; }).concat(extraCc(o && o.supplierCc).split(", ").filter(Boolean)); }
 function ccField(id, val){
-  return '<label>CC</label><div class="ccbox"><span class="ccmain" title="Always copied in">🔒 ' + esc(MAIN_CC.name) + ' &lt;' + esc(MAIN_CC.email) + '&gt;</span>' +
+  return '<label>CC</label><div class="ccbox">' + MAIN_CCS.map(function(m){ return '<span class="ccmain" title="Always copied in">🔒 ' + esc(m.name) + ' &lt;' + esc(m.email) + '&gt;</span>'; }).join("") +
     '<input id="' + id + '" type="text" value="' + esc(extraCc(val)) + '" placeholder="+ add more emails, e.g. accounts@supplier.co.za"></div>';
 }
 function allSuppliers(){
@@ -1106,10 +1107,11 @@ function viewList(){
     var dow = new Date().getDay();
     h += '<div class="card alert"><h2>' + (dow === 1 ? "Monday check — overdue deliveries" : dow === 3 ? "Wednesday check — overdue deliveries" : "Overdue deliveries") + '</h2><p class="small muted" style="margin-top:0">Past the delivery date the supplier gave (or ' + LATE_DAYS + '+ days since ordering if no date was given) and not fully delivered. Follow up with these suppliers.</p><div class="olist">' + late.map(orderCard).join("") + '</div></div>';
   }
-  var filters = [["open","Open orders"],["quote","Quotes"],["po","Purchase orders"],["done","Received / closed"],["all","All"]];
+  var filters = [["open","Open orders"],["quote","Quotes"],["po","Purchase orders"],["dn","Delivery notes"],["done","Received / closed"],["all","All"]];
   h += '<div class="card"><div class="tabs">' + filters.map(function(f){ return '<button type="button" data-filter="' + f[0] + '" class="' + (ui.filter===f[0]?"on":"") + '">' + f[1] + '</button>'; }).join("") + '</div>' +
        '<input id="search" placeholder="Search supplier, order no. or item…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
   if(ui.filter === "po"){ h += poTabHtml(all) + '</div>'; return h; }
+  if(ui.filter === "dn"){ h += dnTabHtml(all) + '</div>'; return h; }
   var shown = all.filter(function(o){
     if(ui.filter === "open") return isOpen(o);
     if(ui.filter === "quote") return o.status === "quote";
@@ -1255,10 +1257,10 @@ function viewOrder(o){
   var dels = Object.keys(o.deliveries || {}).map(function(k){ return Object.assign({ id:k }, o.deliveries[k]); }).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); });
   h += '<div class="card"><h2>Deliveries</h2>' + (dels.length ? '<ul class="hist">' + dels.map(function(d){ var t = new Date(d.ts);
       return '<li><b>' + t.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }) + '</b> ' + t.toLocaleTimeString("en-ZA", { hour:"2-digit", minute:"2-digit" }) + (d.docRef ? " · " + esc(d.docRef) : "") + ' · ' + esc(d.user || "") + (d.location ? " · " + esc(d.location) : "") +
-        (d.fileUrl ? ' · <a href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">delivery note</a>' : '') +
+        (d.fileUrl ? ' · <a href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">📄 view delivery note</a>' : ' · <span class="muted">no delivery note saved</span>') +
         '<div class="muted small">' + list(d.lines).map(function(x){ return esc(x.qty + " × " + (x.item || "")) + (x.was !== undefined ? ' <span style="color:var(--amber)">(corrected from ' + esc(x.was) + ')</span>' : ''); }).join("<br>") + '</div>' +
         (d.corrections ? '<div class="small" style="color:var(--amber);margin-top:4px">' + list(d.corrections).map(function(c){ return '✎ ' + esc(c.user) + ' · ' + esc(new Date(c.ts).toLocaleDateString("en-ZA", { day:"2-digit", month:"short" })) + ': ' + esc(c.note || ""); }).join("<br>") + '</div>' : '') +
-        (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-fixdel="' + esc(d.id) + '" style="margin-top:6px">✎ Correct this delivery</button>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing delivered yet.</div>') + '</div>';
+        (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-fixdel="' + esc(d.id) + '" style="margin-top:6px">✎ Correct this delivery</button> <button class="btn btn-sm" data-attachdel="' + esc(d.id) + '" style="margin-top:6px">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing delivered yet.</div>') + '</div>';
   footer(null);
   return h;
 }
@@ -1334,12 +1336,35 @@ function rcvScore(src, line){
   var nums = !a.n.length && !b.n.length ? 1 : (!a.n.length || !b.n.length) ? 0.5 : a.n.filter(function(x){ return b.n.indexOf(x) >= 0; }).length / Math.max(a.n.length, b.n.length);
   return words * 0.6 + nums * 0.4;
 }
+// When the supplier's name can't be read (e.g. it's only in their logo, like Phoenix Glass),
+// look for other clues on the note: our quote / PO number, their item codes, their phone number,
+// or the main word of their name. Only used if exactly one supplier fits.
+function clueSupplier(text, raw, open){
+  var T = plain(text), D9 = " " + String(text || "").replace(/[^0-9]+/g, " ") + " ", DIG = String(text || "").replace(/\D+/g, ""), sc = {};
+  function hit(name, v){ if(name && !isUs(name)) sc[name] = Math.max(sc[name] || 0, v); }
+  function hasNo(v){ v = String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); return v.length >= 4 && /\d/.test(v) && (T.indexOf(" " + v + " ") >= 0 || (/^\d+$/.test(v) && D9.indexOf(" " + v + " ") >= 0)); }
+  function phone(v){ v = String(v || "").replace(/\D+/g, "").replace(/^27/, "0"); return v.length >= 9 ? v.slice(-9) : ""; }
+  var codes = {}; (raw || []).forEach(function(l){ var c = L.norm(l.code); if(c && c.length >= 4) codes[c] = 1; });
+  open.forEach(function(o){
+    if(hasNo(o.ref) || hasNo(o.po)) hit(o.supplier, 3);                                  // their quote no. or our PO no. is on the note
+    if(orderLines(o).some(function(l){ return outstanding(l) > 0 && l.code && codes[L.norm(l.code)]; })) hit(o.supplier, 2);  // same item code
+    var rec = supRec(o.supplier) || {};
+    [o.supplierTel, rec.tel, rec.cell, rec.fax].forEach(function(t){ var p = phone(t); if(p && DIG.indexOf(p) >= 0) hit(o.supplier, 2); });
+    var k = supKeys(o.supplier).filter(function(w){ return w.length >= 5 && !GENERIC[w]; })[0];   // "phoenix", "leuco", "jamac"
+    if(k && T.indexOf(" " + k + " ") >= 0) hit(o.supplier, 1);
+  });
+  var names = Object.keys(sc).sort(function(a, b){ return sc[b] - sc[a]; });
+  if(!names.length || (names[1] && sc[names[1]] === sc[names[0]])) return null;
+  return { name:names[0] };
+}
+var GENERIC = { glass:1, timber:1, boards:1, board:1, tools:1, tool:1, industries:1, industrial:1, supplies:1, supply:1, hardware:1, office:1, sales:1, technologies:1, technology:1, woodworking:1, machinery:1, packaging:1, adhesive:1, adhesives:1, agencies:1, trading:1, products:1, distributors:1, services:1, systems:1, africa:1, south:1, national:1, international:1 };
+function supRec(name){ var k = String(name || "").trim().toLowerCase(); return Object.keys(D.sups || {}).map(function(id){ return D.sups[id]; }).find(function(r){ return r && String(r.name || "").trim().toLowerCase() === k; }); }
 // Work out whose delivery note it is, then match its lines to that supplier's open orders.
 function rcvDoc(raw){
   if(!rcv.docRef){ var ref = detectRef(docText, "delivery"); if(ref) rcv.docRef = ref; }
   var open = ordersArr().filter(function(o){ return isOpen(o) && orderOut(o) > 0 && (!rcv.orderId || o.id === rcv.orderId); });
   var cands = []; open.forEach(function(o){ if(!cands.some(function(c){ return c.name === o.supplier; })) cands.push({ name:o.supplier, email:o.supplierEmail || "" }); });
-  var s = detectSupplier(docText, cands);
+  var s = detectSupplier(docText, cands) || clueSupplier(docText, raw, open);
   if(!rcv.supplier){
     if(!s){ rcv.pending = raw; toast("Couldn't tell which supplier this is from — pick the supplier above.", "err"); return; }
     rcv.supplier = s.name;
@@ -1567,7 +1592,8 @@ async function saveReceive(){
     await db.ref("stockIn/receipts/" + did).set({ ts:ts, user:who, target: items.every(function(x){ return x.t === "board"; }) ? "board" : "consumables", location:loc, supplier:r.supplier,
       docRef:(r.docRef || "") + (refs ? " · order " + refs : ""), fileName: r.file ? r.file.name : "", fileUrl:fileUrl,
       lines: items.filter(function(x){ return x.t; }).map(function(x){ return { item:stockLabel({ stock:x.newStock || x.stock, nf:x.nf }), qty:x.qty, unit:unitOf(x.c.line) }; }) });
-    toast("Received " + items.length + " line" + (items.length===1?"":"s") + " — stock updated.", "ok");
+    if(r.file && !fileUrl) toast("Received — stock updated, but the delivery note file didn't save. Open Delivery notes and tap “Attach delivery note”.", "err");
+    else toast("Received " + items.length + " line" + (items.length===1?"":"s") + " — stock updated.", "ok");
     var single = Object.keys(byOrder).length === 1 ? Object.keys(byOrder)[0] : null;
     rcv = null; ui.view = single ? "order" : "list"; ui.orderId = single;
   }catch(e){ console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
@@ -1714,6 +1740,45 @@ function openApprovers(){
     var a = {}; document.querySelectorAll("[data-appr]").forEach(function(c){ if(c.checked) a[c.getAttribute("data-appr")] = true; });
     try{ await db.ref("orders/approvers").set(a); D.approvers = a; closeModal(); toast("Saved who can approve orders.", "ok"); render(); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
   };
+}
+// Every delivery received through Orders, newest first, with the scanned delivery note to open again (2026-10-08).
+function allDeliveries(all){
+  var by = {};
+  all.forEach(function(o){ Object.keys(o.deliveries || {}).forEach(function(did){ var d = o.deliveries[did] || {};
+    var x = by[did] || (by[did] = { id:did, ts:d.ts, user:d.user, docRef:d.docRef, location:d.location, fileUrl:"", fileName:"", supplier:o.supplier, orders:[], lines:[] });
+    if(d.fileUrl && !x.fileUrl){ x.fileUrl = d.fileUrl; x.fileName = d.fileName || ""; }
+    x.orders.push(o); list(d.lines).forEach(function(l){ x.lines.push(l); }); }); });
+  return Object.keys(by).map(function(k){ return by[k]; }).sort(function(a, b){ return String(b.ts).localeCompare(String(a.ts)); });
+}
+function dnTabHtml(all){
+  var dels = allDeliveries(all), q = ui.search.trim().toLowerCase();
+  if(q) dels = dels.filter(function(d){ return [d.docRef, d.supplier, d.user, d.location, d.fileName].concat(d.orders.map(function(o){ return [o.po, o.ref].join(" "); }), d.lines.map(function(l){ return l.item; })).join(" ").toLowerCase().indexOf(q) >= 0; });
+  if(!dels.length) return '<div class="empty">' + (q ? "No delivery notes match." : "No deliveries received yet. They appear here after “Receive a delivery”.") + '</div>';
+  return '<div class="olist">' + dels.map(function(d){ var t = new Date(d.ts);
+    return '<div class="ord"><div class="h"><b>' + esc(d.supplier || "") + (d.docRef ? ' · ' + esc(d.docRef) : '') + '</b><span class="small muted">' + esc(t.toLocaleDateString("en-ZA", { day:"2-digit", month:"short", year:"numeric" })) + '</span></div>' +
+      '<div class="small muted">' + d.orders.map(function(o){ return '<a href="#" data-open="' + esc(o.id) + '" style="color:var(--amber)">' + esc(o.po ? "PO " + o.po : (o.ref || "order")) + '</a>'; }).join(", ") + ' · received by ' + esc(d.user || "—") + (d.location ? ' · 📍 ' + esc(d.location) : '') + '</div>' +
+      '<div class="small" style="margin-top:4px">' + d.lines.slice(0, 6).map(function(l){ return esc(l.qty + " × " + (l.item || "")); }).join("<br>") + (d.lines.length > 6 ? '<br><span class="muted">+ ' + (d.lines.length - 6) + ' more</span>' : '') + '</div>' +
+      '<div class="row" style="margin-top:8px">' + (d.fileUrl ? '<a class="btn btn-sm" href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener">📄 View delivery note</a>' : '<span class="small muted">No delivery note saved</span>') +
+      (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-attachdel="' + esc(d.id) + '">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') + '</div></div>';
+  }).join("") + '</div>';
+}
+// Add (or replace) the scanned delivery note on a delivery that has already been received.
+function attachDeliveryNote(did){
+  var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pdf,image/*,.xlsx,.xls,.csv";
+  inp.onchange = async function(){
+    var f = inp.files && inp.files[0]; if(!f) return;
+    toast("Saving the delivery note…", "ok");
+    var url = await uploadDoc("orderDocs", did, f);
+    if(!url){ toast("Couldn't save the file — check your connection and try again.", "err"); return; }
+    try{
+      var upd = {};
+      Object.keys(D.orders).forEach(function(oid){ var o = D.orders[oid]; if(o && o.deliveries && o.deliveries[did]){ upd["orders/list/" + oid + "/deliveries/" + did + "/fileUrl"] = url; upd["orders/list/" + oid + "/deliveries/" + did + "/fileName"] = f.name; } });
+      await db.ref().update(upd);
+      db.ref("stockIn/receipts/" + did).once("value", function(s){ if(s.exists()) db.ref("stockIn/receipts/" + did).update({ fileUrl:url, fileName:f.name }); });
+      toast("Delivery note saved.", "ok");
+    }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+  inp.click();
 }
 function poTabHtml(all){
   var pos = all.filter(function(o){ return o.po; }).sort(function(a,b){ return num(b.po) - num(a.po); });
@@ -2017,7 +2082,8 @@ function bind(){
   qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
   qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
   if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
-  qa("[data-open]").forEach(function(c){ c.onclick = function(){ ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
+  qa("[data-attachdel]").forEach(function(b){ b.onclick = function(){ attachDeliveryNote(b.getAttribute("data-attachdel")); }; });
+  qa("[data-open]").forEach(function(c){ c.onclick = function(e){ if(e) e.preventDefault(); ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
   // purchase order page
   if(ui.view === "po" && D.orders[ui.orderId]){
     var po = D.orders[ui.orderId]; po.id = ui.orderId;
