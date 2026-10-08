@@ -1107,8 +1107,10 @@ function viewList(){
   var team = core.getUsers().filter(function(u){ return u && u.username; });
   var names = function(k){ return team.filter(function(u){ return perm2(u, k); }).map(function(u){ return u.username; }).sort(); };
   var ap = names("ordersApprove"), qu = names("ordersQuotes");
+  var ed = team.filter(function(u){ return u && (core.isMainRoot(u) || (u.permissions && u.permissions.ordersEditDeliveries)); }).map(function(u){ return u.username; }).sort();
   h += '<div class="card" style="padding:12px 14px"><div class="small"><b>Can approve orders:</b> ' + (ap.length ? ap.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">✓ ' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
        '<div class="small" style="margin-top:6px"><b>Can add quotes:</b> ' + (qu.length ? qu.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
+       '<div class="small" style="margin-top:6px"><b>Can edit received deliveries:</b> ' + (ed.length ? ed.map(function(n){ return '<span class="pill ordered" style="margin:2px 4px 2px 0;display:inline-block">' + esc(n) + '</span>'; }).join("") : '<span class="muted">nobody yet</span>') + '</div>' +
        '<div class="small muted" style="margin-top:6px">' + (canApprove() ? 'You can approve orders.' : 'You can\'t approve orders — ask Sean if you need to.') + (isMain() ? ' Change this in the Users app.' : '') + '</div></div>';
   if(late.length){
     var dow = new Date().getDay();
@@ -1267,7 +1269,7 @@ function viewOrder(o){
         (d.fileUrl ? ' · <a href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">📄 view delivery note</a>' : ' · <span class="muted">no delivery note saved</span>') +
         '<div class="muted small">' + list(d.lines).map(function(x){ return esc(x.qty + " × " + (x.item || "")) + (x.was !== undefined ? ' <span style="color:var(--amber)">(corrected from ' + esc(x.was) + ')</span>' : ''); }).join("<br>") + '</div>' +
         (d.corrections ? '<div class="small" style="color:var(--amber);margin-top:4px">' + list(d.corrections).map(function(c){ return '✎ ' + esc(c.user) + ' · ' + esc(new Date(c.ts).toLocaleDateString("en-ZA", { day:"2-digit", month:"short" })) + ': ' + esc(c.note || ""); }).join("<br>") + '</div>' : '') +
-        (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-fixdel="' + esc(d.id) + '" style="margin-top:6px">✎ Correct this delivery</button> <button class="btn btn-sm" data-attachdel="' + esc(d.id) + '" style="margin-top:6px">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing delivered yet.</div>') + '</div>';
+        (canBoard(user) || canCons(user) || user.isRoot ? (canEditDel() ? '<button class="btn btn-sm" data-fixdel="' + esc(d.id) + '" style="margin-top:6px">✎ Edit this delivery</button> ' : '') + '<button class="btn btn-sm" data-attachdel="' + esc(d.id) + '" style="margin-top:6px">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing delivered yet.</div>') + '</div>';
   footer(null);
   return h;
 }
@@ -1619,50 +1621,80 @@ async function saveReceive(){
   busy = false; render();
 }
 // Something was received that wasn't on the delivery note: take it back off the order and out of stock.
+// Main root, and the people ticked in Users → Orders → "Edit received deliveries", can fix a delivery after it was received (2026-10-08).
+function canEditDel(){ return !!(user && (core.isMainRoot(user) || (user.permissions && user.permissions.ordersEditDeliveries))); }
 function fixDeliveryModal(o, did){
   var d = o.deliveries && o.deliveries[did]; if(!d) return;
+  if(!canEditDel()){ toast("Only Sean, or people he has allowed in Users, can edit a delivery.", "err"); return; }
   var rows = Object.keys(d.lines || {}).filter(function(k){ return d.lines[k]; }).map(function(k){ return Object.assign({ i:k }, d.lines[k]); });
-  openModal('<h2>Correct this delivery</h2><p class="small muted" style="margin-top:0">' + esc(new Date(d.ts).toLocaleString("en-ZA")) + (d.docRef ? ' · ' + esc(d.docRef) : '') + ' · ' + esc(d.location || "") + '</p>' +
-    '<p class="small">Change the quantity to what <b>actually arrived</b> (0 if it never came). The difference is taken off the order — so it shows as still to come — and out of stock at ' + esc(d.location || "") + '.</p>' +
+  var others = Object.keys(o.lines || {}).filter(function(k){ return o.lines[k]; }).map(function(k){ return Object.assign({ lid:k }, o.lines[k]); })
+    .sort(function(a, b){ return num(a.n) - num(b.n); });
+  var opt = function(l){ return '<option value="' + esc(l.lid) + '">' + esc((l.desc || l.text || stockLabel(l)).slice(0, 70) + ' — ' + num(l.received) + ' of ' + num(l.qty) + ' ' + unitOf(l) + ' received') + '</option>'; };
+  var addRow = function(){ return '<div class="row addrow" style="align-items:center;margin:6px 0;flex-wrap:nowrap"><select data-addl style="flex:1"><option value="">— pick an order line —</option>' + others.map(opt).join("") + '</select><input type="number" min="0" step="any" inputmode="decimal" data-addq placeholder="qty" style="width:90px"></div>'; };
+  openModal('<h2>Edit this delivery</h2><p class="small muted" style="margin-top:0">' + esc(new Date(d.ts).toLocaleString("en-ZA")) + ' · received by ' + esc(d.user || "") + ' · ' + esc(d.location || "") + '</p>' +
+    '<label>Delivery note no.</label><input id="fixRef" value="' + esc(d.docRef || "") + '" placeholder="e.g. DEL2672">' +
+    '<p class="small" style="margin:14px 0 4px">Set each quantity to what <b>actually arrived</b> (0 if it never came). The order and the stock at ' + esc(d.location || "") + ' are adjusted by the difference — up or down.</p>' +
     rows.map(function(x){ var l = (o.lines || {})[x.lid] || {};
       return '<div class="row" style="align-items:center;margin:8px 0;flex-wrap:nowrap"><div style="flex:1">' + esc(x.item || l.desc || l.text || "") + '<div class="small muted">received ' + esc(x.qty) + ' ' + esc(unitOf(l)) + ' → ' + esc(stockLabel(l)) + '</div></div>' +
-        '<input type="number" min="0" step="any" inputmode="decimal" data-fixq="' + x.i + '" value="' + esc(x.qty) + '" style="width:90px"></div>'; }).join("") +
-    '<label>Why? (shows on the order)</label><input id="fixNote" placeholder="e.g. Large gloves weren\'t on the delivery note">' +
-    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save correction</button></div>');
+        '<input type="number" min="0" step="any" inputmode="decimal" data-fixq="' + esc(x.i) + '" value="' + esc(x.qty) + '" style="width:90px"></div>'; }).join("") +
+    '<div class="small" style="margin-top:12px"><b>Ticked off the wrong line, or something missed?</b> Set the wrong line to 0 above and add the right one here:</div><div id="addRows">' + addRow() + '</div>' +
+    '<button class="btn btn-sm" type="button" id="moreRow" style="margin-top:4px">＋ Another line</button>' +
+    '<label style="margin-top:12px">Why? (shows on the order)</label><input id="fixNote" placeholder="e.g. Ticked off P150 instead of P100">' +
+    '<div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save changes</button></div>');
   document.getElementById("mCancel").onclick = closeModal;
+  document.getElementById("moreRow").onclick = function(){ document.getElementById("addRows").insertAdjacentHTML("beforeend", addRow()); };
   document.getElementById("mOk").onclick = async function(){
-    if(!freshUser()) return;
-    var ch = [];
-    rows.forEach(function(x){ var e = document.querySelector('[data-fixq="' + x.i + '"]'); var nv = Math.max(0, num(e && e.value)); if(nv < num(x.qty) - 1e-9) ch.push({ x:x, nv:nv, diff:r2(num(x.qty) - nv) }); else if(nv > num(x.qty) + 1e-9) ch.push({ bad:true }); });
-    if(ch.some(function(c){ return c.bad; })){ toast("You can only lower quantities here. To receive more, use “Receive delivery”.", "err"); return; }
-    if(!ch.length){ toast("Nothing changed.", "err"); return; }
+    if(!freshUser() || !canEditDel()) return;
+    var ch = [], adds = [];
+    rows.forEach(function(x){ var e = document.querySelector('[data-fixq="' + x.i + '"]'); var nv = Math.max(0, r2(num(e && e.value))); var df = r2(nv - num(x.qty));
+      if(Math.abs(df) > 1e-9) ch.push({ x:x, lid:x.lid, nv:nv, diff:df, item:x.item || "" }); });
+    document.querySelectorAll("#addRows .addrow").forEach(function(r){ var lid = r.querySelector("[data-addl]").value, q = r2(num(r.querySelector("[data-addq]").value));
+      if(lid && q > 0){ var l = o.lines[lid]; adds.push({ lid:lid, nv:q, diff:q, item:(l.desc || l.text || stockLabel(l)).slice(0, 80) }); } });
+    var newRef = document.getElementById("fixRef").value.trim(), refCh = newRef !== (d.docRef || "");
+    if(!ch.length && !adds.length && !refCh){ toast("Nothing changed.", "err"); return; }
     var note = document.getElementById("fixNote").value.trim();
-    for(var i = 0; i < ch.length; i++){ var l = (o.lines || {})[ch[i].x.lid] || {}, t = targetOf(l.stock);
-      if(t === "board" && !canBoard(user) && !user.isRoot){ toast("You can't change Board Stock — ask Sean.", "err"); return; }
-      if(t === "consumables" && !canCons(user) && !user.isRoot){ toast("You can't change Consumables — ask Sean.", "err"); return; }
-      ch[i].l = l; ch[i].t = t; }
-    if(!confirm("Take these off the order and out of stock at " + (d.location || "") + "?\n\n" + ch.map(function(c){ return "• " + c.diff + " × " + (c.x.item || ""); }).join("\n"))) return;
+    if(!note && (ch.length || adds.length)){ toast("Say why — it shows on the order.", "err"); document.getElementById("fixNote").focus(); return; }
+    var all = ch.concat(adds);
+    for(var i = 0; i < all.length; i++){ var l = (o.lines || {})[all[i].lid] || {}; all[i].l = l; all[i].t = targetOf(l.stock); }
+    var say = all.map(function(c){ return "• " + (c.diff > 0 ? "+" : "") + c.diff + " " + unitOf(c.l) + " × " + c.item; });
+    if(refCh) say.unshift("• Delivery note no. → " + (newRef || "(none)"));
+    if(!confirm("Save these changes to the order and the stock at " + (d.location || "") + "?\n\n" + say.join("\n"))) return;
     var btn = this; btn.disabled = true;
     try{
-      var loc = d.location || o.location, who = user.username, reason = "Correction — not delivered" + (d.docRef ? " (" + d.docRef + ")" : "") + " from " + o.supplier + (note ? ": " + note : "");
-      await removeBoards(ch.filter(function(c){ return c.t === "board"; }).map(function(c){ return { stock:c.l.stock, qty:c.diff }; }), loc, who, reason);
-      await removeCons(ch.filter(function(c){ return c.t === "consumables"; }).map(function(c){ return { stock:c.l.stock, sq:toStockQty(c.l, c.diff) }; }), loc);
+      var loc = d.location || o.location, who = user.username, reason = "Delivery edited" + (newRef ? " (" + newRef + ")" : "") + " from " + o.supplier + (note ? ": " + note : "");
+      var down = all.filter(function(c){ return c.diff < 0; }), up = all.filter(function(c){ return c.diff > 0; });
+      await removeBoards(down.filter(function(c){ return c.t === "board"; }).map(function(c){ return { stock:c.l.stock, qty:-c.diff }; }), loc, who, reason);
+      await removeCons(down.filter(function(c){ return c.t === "consumables"; }).map(function(c){ return { stock:c.l.stock, sq:toStockQty(c.l, -c.diff) }; }), loc);
+      var ub = up.filter(function(c){ return c.t === "board"; }).map(function(c){ return { c:c, qty:c.diff, stock:c.l.stock, nf:c.l.nf || null }; });
+      var uc = up.filter(function(c){ return c.t === "consumables"; }).map(function(c){ return { c:c, qty:c.diff, sq:toStockQty(c.l, c.diff), stock:c.l.stock, nf:c.l.nf || null }; });
+      await addBoards(ub, loc, who, reason); await addCons(uc, loc);
+      ub.concat(uc).forEach(function(x){ if(x.newStock && x.newStock !== x.stock) x.c.newStock = x.newStock; });
       var res = await db.ref("orders/list/" + o.id).transaction(function(cur){
         if(!cur || !cur.deliveries || !cur.deliveries[did]) return;
         var dl = cur.deliveries[did];
+        if(Array.isArray(dl.lines)){ var ob = {}; dl.lines.forEach(function(v, k){ if(v) ob[k] = v; }); dl.lines = ob; }
+        dl.lines = dl.lines || {};
         ch.forEach(function(c){
-          var ln = cur.lines && cur.lines[c.x.lid]; if(ln) ln.received = Math.max(0, r2(num(ln.received) - c.diff));
-          var row = dl.lines && dl.lines[c.x.i]; if(row){ if(row.was === undefined) row.was = row.qty; row.qty = c.nv; }
+          var ln = cur.lines && cur.lines[c.lid]; if(ln){ ln.received = Math.max(0, r2(num(ln.received) + c.diff)); if(c.newStock){ ln.stock = c.newStock; delete ln.nf; } }
+          var row = dl.lines[c.x.i]; if(row){ if(row.was === undefined) row.was = row.qty; row.qty = c.nv; }
         });
+        adds.forEach(function(c){
+          var ln = cur.lines && cur.lines[c.lid]; if(ln){ ln.received = r2(num(ln.received) + c.diff); if(c.newStock){ ln.stock = c.newStock; delete ln.nf; } }
+          var k = Object.keys(dl.lines).find(function(k2){ return dl.lines[k2] && dl.lines[k2].lid === c.lid; });
+          if(k){ var rw = dl.lines[k]; if(rw.was === undefined) rw.was = rw.qty; rw.qty = r2(num(rw.qty) + c.diff); }
+          else { var nk = Object.keys(dl.lines).reduce(function(m, k3){ return Math.max(m, (parseInt(k3, 10) || 0) + 1); }, 0); dl.lines[nk] = { lid:c.lid, qty:c.diff, item:c.item, was:0 }; }
+        });
+        if(refCh) dl.docRef = newRef;
         dl.corrections = dl.corrections || {};
-        dl.corrections[uid()] = { ts:new Date().toISOString(), user:who, note:(note || "not on the delivery note") + " — " + ch.map(function(c){ return "removed " + c.diff + " × " + (c.x.item || ""); }).join(", ") };
+        dl.corrections[uid()] = { ts:new Date().toISOString(), user:who, note:(note || "delivery note no. corrected") + (all.length ? " — " + all.map(function(c){ return (c.diff > 0 ? "added " + c.diff : "removed " + (-c.diff)) + " × " + c.item; }).join(", ") : "") + (refCh ? (all.length ? "; " : " — ") + "delivery note no. " + (d.docRef || "(none)") + " → " + (newRef || "(none)") : "") };
         var left = Object.keys(cur.lines || {}).some(function(k){ return num(cur.lines[k].qty) - num(cur.lines[k].received) > 0.0001; });
         var anyIn = Object.keys(cur.lines || {}).some(function(k){ return num(cur.lines[k].received) > 0; });
         if(cur.status !== "closed") cur.status = left ? (anyIn ? "part" : "ordered") : "received";
         return cur;
       });
       if(!res.committed) throw new Error("The order didn't update — check your connection.");
-      closeModal(); toast("Corrected — " + ch.length + " line" + (ch.length===1?"":"s") + " taken off the order and out of stock.", "ok"); render();
+      if(refCh) db.ref("stockIn/receipts/" + did).once("value", function(sn){ if(sn.exists()) db.ref("stockIn/receipts/" + did).update({ docRef:newRef }); });
+      closeModal(); toast("Delivery updated — order and stock adjusted.", "ok"); render();
     }catch(e){ btn.disabled = false; console.warn(e); toast("Couldn't save: " + (e.message || e), "err"); }
   };
 }
@@ -1778,7 +1810,8 @@ function dnTabHtml(all){
       '<div class="small muted">' + d.orders.map(function(o){ return '<a href="#" data-open="' + esc(o.id) + '" style="color:var(--amber)">' + esc(o.po ? "PO " + o.po : (o.ref || "order")) + '</a>'; }).join(", ") + ' · received by ' + esc(d.user || "—") + (d.location ? ' · 📍 ' + esc(d.location) : '') + '</div>' +
       '<div class="small" style="margin-top:4px">' + d.lines.slice(0, 6).map(function(l){ return esc(l.qty + " × " + (l.item || "")); }).join("<br>") + (d.lines.length > 6 ? '<br><span class="muted">+ ' + (d.lines.length - 6) + ' more</span>' : '') + '</div>' +
       '<div class="row" style="margin-top:8px">' + (d.fileUrl ? '<a class="btn btn-sm" href="' + esc(d.fileUrl) + '" target="_blank" rel="noopener">📄 View delivery note</a>' : '<span class="small muted">No delivery note saved</span>') +
-      (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-attachdel="' + esc(d.id) + '">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') + '</div></div>';
+      (canBoard(user) || canCons(user) || user.isRoot ? '<button class="btn btn-sm" data-attachdel="' + esc(d.id) + '">📎 ' + (d.fileUrl ? 'Replace' : 'Attach') + ' delivery note</button>' : '') +
+      (canEditDel() ? d.orders.map(function(o){ return '<button class="btn btn-sm" data-fixdel2="' + esc(o.id + "|" + d.id) + '">✎ Edit' + (d.orders.length > 1 ? ' (' + esc(o.po ? "PO " + o.po : (o.ref || "order")) + ')' : ' this delivery') + '</button>'; }).join("") : '') + '</div></div>';
   }).join("") + '</div>';
 }
 // Add (or replace) the scanned delivery note on a delivery that has already been received.
@@ -2101,6 +2134,7 @@ function bind(){
   qa("[data-loc]").forEach(function(b){ b.onclick = function(){ setLoc(b.getAttribute("data-loc")); render(); }; });
   qa("[data-filter]").forEach(function(b){ b.onclick = function(){ ui.filter = b.getAttribute("data-filter"); render(); }; });
   if(q("#search")) q("#search").oninput = function(){ ui.search = this.value; var pos = this.selectionStart; render(); var s = q("#search"); s.focus(); try{ s.setSelectionRange(pos, pos); }catch(e){} };
+  qa("[data-fixdel2]").forEach(function(b){ b.onclick = function(){ var p = b.getAttribute("data-fixdel2").split("|"); if(D.orders[p[0]]) fixDeliveryModal(Object.assign({ id:p[0] }, D.orders[p[0]]), p[1]); }; });
   qa("[data-attachdel]").forEach(function(b){ b.onclick = function(){ attachDeliveryNote(b.getAttribute("data-attachdel")); }; });
   qa("[data-open]").forEach(function(c){ c.onclick = function(e){ if(e) e.preventDefault(); ui.orderId = c.getAttribute("data-open"); ui.view = "order"; render(); window.scrollTo(0, 0); }; });
   // purchase order page
