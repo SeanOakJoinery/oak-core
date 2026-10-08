@@ -373,9 +373,16 @@ body.po-view .wrap{max-width:860px}
       var code = /[a-z]/i.test(clean) && /\d/.test(clean) && clean.length >= 3 && clean.length <= 20 && !/^\d+(mm|m|l|ml|kg|g)$/i.test(clean) && !/^\d+x\d+/i.test(clean) && !/^x\d/i.test(clean) && clean.indexOf('"') < 0 && !/^\d+\/\d+/.test(clean);
       return { t: t, clean: clean, i: i, plainInt: plainInt && !money, strictInt: /^\d{1,5}$/.test(clean) && !money, price: price || money, code: code, alpha: /^[a-z][a-z&'/-]*$/i.test(clean) };
     });
-    var qtyIdx = -1, ocrQty = false;
+    var qtyIdx = -1, ocrQty = false, dropIdx = -1;
     // "... x 8" or "qty 8" at the end of the line
     var L = info.length;
+    // Delivery notes with "Ordered  Quantity Supplied" columns: "POLIFOND 31 PU SEALER 25LT  1.000  1.000"
+    // — quantities printed with 3 decimals at the end; the last one is what was supplied (2026-10-08).
+    var Q3 = /^\d{1,6}\.\d{3}$/;
+    if (L > 2 && Q3.test(info[L - 1].clean)) {
+      if (Q3.test(info[L - 2].clean)) { qtyIdx = L - 1; dropIdx = L - 2; }
+      else if (!info.some(function (x) { return x.price; })) qtyIdx = L - 1;
+    }
     // Invoice / quote tables: "… DESCRIPTION 5 Each 564.00 …" — the number just before the unit word is the qty.
     var UNITQ = /^(ea|each|pcs|pc|no|nos|units?|sheets?|pr|prs|pairs?|box|boxes|pk|pkt|packs?|rolls?|ltr|kg|lengths?|bags?|sets?|tins?|tubes?|cartons?)$/i;
     for (var u = L - 1; u >= 2 && qtyIdx < 0; u--) {
@@ -425,7 +432,7 @@ body.po-view .wrap{max-width:860px}
     var lead = null;
     if (qtyIdx > 1 && /^\d{1,10}$/.test(info[0].clean)) { lead = info[0]; if (info[0].clean.length >= 3) codeTok = info[0]; }
     var descEnd = qtyIdx === 0 ? info.length : qtyIdx;
-    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
+    var desc = info.filter(function (x) { return x.i < descEnd && !(qtyIdx === L - 1 && x.i === L - 2 && /^(x|qty:?)$/i.test(x.t)) && x.i !== qtyIdx && x.i !== dropIdx && (!codeTok || x.i !== codeTok.i) && !x.price; })
       .filter(function (x) { return !lead || x.i !== lead.i; })
       .map(function (x) { return x.t; }).join(" ").replace(/\s+/g, " ").trim();
     // Drop trailing unit words ("EA", "each") from the description
@@ -1014,7 +1021,7 @@ function detectRef(text, kind){
   var t = String(text || "");
   var pats = kind === "quote"
     ? [/\b(?:quot(?:e|ation)|qte|quo)\s*(?:no\.?|number|nr|#)?\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i, /\b((?:QU|QUO|QTE|SOQ)[-\s]?\d{3,}[\w-]*)\b/]
-    : [/\b(?:delivery\s*note|d\/n|tax\s*invoice|invoice|inv)\s*(?:no\.?|number|nr|#)?\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i, /\b((?:IN|INV|DN|SO)[-\s]?\d{4,}[\w-]*)\b/];
+    : [/\b((?:DEL|DN|DLN|DLV)[-\s]?\d{3,}[\w-]*)\b/, /\b(?:delivery\s*note|d\/n|tax\s*invoice|invoice|inv)\s*(?:no\.?|number|nr|#)?\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i, /\b((?:IN|INV|DN|SO)[-\s]?\d{4,}[\w-]*)\b/];
   pats = pats.concat([/\bdocument\s*(?:no\.?|number|nr|#)\s*[:\-]?\s*([A-Z]{0,5}[-\/]?\d[\w\-\/]{2,})/i]);
   for(var i = 0; i < pats.length; i++){ var m = t.match(pats[i]); if(m && m[1] && !/^\d{1,3}$/.test(m[1])){
     var r = m[1].replace(/\s+/g, "").slice(0, 30);
@@ -1285,15 +1292,19 @@ function addRcvLines(raw, source){
   var cands = openLinesFor(rcv.supplier, rcv.orderId);
   var its = cands.map(function(c){ return { id:c.id, code:c.code, desc:c.desc, size:c.size, text:c.text }; });
   var cc = {}; raw.forEach(function(l){ var c = L.norm(l.code); if(c) cc[c] = (cc[c]||0) + 1; });
-  var got = 0;
+  var got = 0, used = {};
+  rcv.lines.forEach(function(x){ if(x.match) used[x.match] = 1; });
   raw.forEach(function(l){
     var m = L.matchLine(l, its, {}, {});
     var match = m.itemId || "", how = m.how, score = m.score;
+    // the same item ordered twice (e.g. two lines of hardener): fill the next unused order line, not the same one twice
+    if(match && used[match]){ var mc = cands.find(function(c){ return c.id === match; }), alt = mc && cands.find(function(c){ return !used[c.id] && sameItem(c.line, mc.line); }); if(alt) match = alt.id; }
     if(!match){
       // compare the wording and sizes with each open order line (prices and quantities ignored)
-      var best = null, bs = 0, second = 0;
-      cands.forEach(function(c){ var sc = rcvScore(l, c.line); if(sc > bs){ second = bs; bs = sc; best = c; } else if(sc > second) second = sc; });
-      if(best && bs >= 0.6 && (bs - second > 0.05 || cands.length === 1)){ match = best.id; how = "fuzzy"; score = bs >= 0.9 ? 0.9 : bs; }
+      var best = null, bs = 0, second = 0, secondC = null;
+      cands.forEach(function(c){ var sc = rcvScore(l, c.line) - (used[c.id] ? 0.01 : 0); if(sc > bs){ second = bs; secondC = best; bs = sc; best = c; } else if(sc > second){ second = sc; secondC = c; } });
+      var twin = best && secondC && sameItem(best.line, secondC.line);
+      if(best && bs >= 0.6 && (bs - second > 0.05 || cands.length === 1 || twin)){ match = best.id; how = "fuzzy"; score = bs >= 0.9 ? 0.9 : bs; }
     }
     if(!match){
       // try via the stock item: supplier wording learned in Stock In → board/consumable → the order line for it
@@ -1301,7 +1312,7 @@ function addRcvLines(raw, source){
       var c = s.score >= 0.75 && cands.find(function(x){ return x.line.stock === s.id && !variantsClash([l.desc || l.text, l.size].join(" "), [x.line.desc || x.line.text, x.line.size].join(" ")); });
       if(c){ match = c.id; how = "stock"; score = s.score; }
     }
-    if(match) got++;
+    if(match){ got++; used[match] = 1; }
     rcv.lines.push({ key:++seq, src:l, qty:num(l.qty), match:match, how:how, score:score });
   });
   toast("Read " + raw.length + " line" + (raw.length===1?"":"s") + " — " + got + " matched to the order. Check them below.", "ok");
@@ -1325,8 +1336,16 @@ function variantsClash(a, b){
     return !sameVariant(x, y);
   });
 }
+// Delivery notes often print a cut-off item code ("PF31-25/PU/S/P/TI" for "PF31-25/PU/S/P/TRANS/STD/STOCK").
+function codeKey2(c){ return String(c || "").toUpperCase().replace(/[^A-Z0-9]+/g, "").replace(/O/g, "0"); }
+function codesMatch(a, b){
+  a = codeKey2(a); b = codeKey2(b); if(!a || !b) return false; if(a === b) return true;
+  var n = 0, m = Math.min(a.length, b.length); while(n < m && a[n] === b[n]) n++;
+  return n >= 7 && n >= m - 2;
+}
+function sameItem(x, y){ return L.norm([x.code, x.desc || x.text, x.size].join(" ")) === L.norm([y.code, y.desc || y.text, y.size].join(" ")); }
 function rcvScore(src, line){
-  if(src.code && line.code && L.norm(src.code) === L.norm(line.code)) return 1;
+  if(src.code && line.code && (L.norm(src.code) === L.norm(line.code) || codesMatch(src.code, line.code))) return 1;
   // "Latex gloves Medium" must never tick off "Latex gloves Large"
   if(variantsClash([src.desc || src.text, src.size].join(" "), [line.desc || line.text, line.size].join(" "))) return 0;
   var a = wordsNums([src.code, src.desc || src.text].join(" ")), b = wordsNums([line.code, line.desc || line.text].join(" "));
