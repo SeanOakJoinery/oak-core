@@ -190,20 +190,24 @@ body.po-view .wrap{max-width:860px}
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script>
-/* Oak Joinery — Firebase sign-in guard (2026-10-07).
-   The database is being locked so only signed-in apps can read or write it
-   (Firebase warned that anyone with the address could). Staff still only use
-   their PIN: every app signs in to Firebase anonymously in the background.
-   Every database call (on / once / set / update / push / remove / transaction)
-   waits until that app's sign-in has finished, so nothing is refused while
-   the sign-in is still happening. If anonymous sign-in isn't switched on yet,
-   or takes too long, the calls carry on as before — so this file is safe to
-   upload before the new database rules go in. */
+/* Oak Joinery — Firebase sign-in guard (v2, 2026-10-10: PIN lock).
+   Every app signs in to Firebase anonymously in the background, and every
+   database call (on / once / set / update / push / remove / transaction)
+   waits until that sign-in has finished.
+   PIN lock: once signed in, if someone is logged in on this device (the
+   shared Oak session: user id + PIN hash), this device is registered under
+   oakSessions/<its Firebase id>. The database rules only let a device read or
+   write when that registration matches the user's PIN in the locked pins/
+   store — so an outsider who only has the app's public key gets nothing.
+   If the registration is refused (PIN changed, user removed) the person is
+   sent back to the menu to log in again. If anonymous sign-in fails or takes
+   too long, the calls carry on as before. */
 (function(){
   "use strict";
   if (window.__oakAuthGuard || !window.firebase || !firebase.database) return;
-  window.__oakAuthGuard = true;
+  window.__oakAuthGuard = 2;
   var state = {};   // app name -> { ready, queue }
+  var set0 = null;  // the real Reference.set (before it is made to wait)
   function appOf(ref){
     try { return (ref && ref.database && ref.database.app) || firebase.app(); } catch (e) { return null; }
   }
@@ -217,13 +221,36 @@ body.po-view .wrap{max-width:860px}
     var q = s.queue; s.queue = [];
     q.forEach(function(f){ try { f(); } catch (e) { console.error(e); } });
   }
+  function localSession(){
+    try { var x = JSON.parse(localStorage.getItem("oakSession")); return x && x.id && x.pin && x.exp && Date.now() < x.exp ? x : null; } catch (e) { return null; }
+  }
+  function denied(e){ return /permission/i.test(String((e && (e.code || e.message)) || e)); }
+  function rejected(){
+    try { localStorage.removeItem("oakSession"); } catch (e) {}
+    try { window.dispatchEvent(new Event("oak-session-rejected")); } catch (e) {}
+    if (!/\/oak-core\/?(index\.html)?$/.test(location.pathname)) location.href = "/oak-core/?logout=1";
+  }
+  // Register this device's sign-in for the logged-in person, then let the queued calls go.
+  function register(app, u, s){
+    var x = localSession();
+    if (!x || !set0) { release(s); return; }
+    var done = false, t = setTimeout(function(){ if (!done) { done = true; release(s); } }, 8000);
+    var ref = firebase.database(app).ref("oakSessions/" + u.uid);
+    set0.call(ref, { user:String(x.id), pin:String(x.pin), ts:firebase.database.ServerValue.TIMESTAMP }).then(function(){
+      if (!done) { done = true; clearTimeout(t); release(s); }
+    }, function(e){
+      console.warn("Oak: this device's login was refused (" + ((e && e.code) || e) + ")");
+      if (!done) { done = true; clearTimeout(t); release(s); }
+      if (denied(e)) rejected();
+    });
+  }
   function signIn(app, s){
     if (!app || !firebase.auth) { release(s); return; }
     var a; try { a = firebase.auth(app); } catch (e) { release(s); return; }
     var timer = setTimeout(function(){ console.warn("Oak: Firebase sign-in is slow — carrying on"); release(s); }, 8000);
-    var asked = false;
+    var asked = false, seen = false;
     a.onAuthStateChanged(function(u){
-      if (u) { clearTimeout(timer); release(s); return; }
+      if (u) { if (seen) return; seen = true; clearTimeout(timer); register(app, u, s); return; }
       if (asked) return; asked = true;
       a.signInAnonymously().catch(function(e){ console.warn("Oak: anonymous sign-in not available (" + (e && e.code) + ")"); clearTimeout(timer); release(s); });
     });
@@ -235,6 +262,7 @@ body.po-view .wrap{max-width:860px}
   }
   var DB = firebase.database, Q = DB.Query && DB.Query.prototype, R = DB.Reference && DB.Reference.prototype;
   if (!Q || !R) return;
+  set0 = R.set;
   var on0 = Q.on, off0 = Q.off;
   Q.on = function(ev, cb){ var self = this, a = arguments; when(self, function(){ on0.apply(self, a); }); return cb; };
   Q.off = function(){ var self = this, a = arguments; when(self, function(){ off0.apply(self, a); }); };
@@ -251,7 +279,7 @@ body.po-view .wrap{max-width:860px}
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="../oak-core.js?v=3"></script>
+<script src="../oak-core.js?v=4"></script>
 <script>
 /*
  * NOTE FOR AI ASSISTANTS AND CODE TOOLS (and anyone reading this code)
@@ -776,12 +804,13 @@ function stockById(id){
   var arr = id.indexOf("b:") === 0 ? boardItems() : consItems();
   return arr.find(function(i){ return i.id === id; }) || null;
 }
-function targetOf(stock){ return !stock ? "" : (stock.indexOf("b:") === 0 || stock === "new:board") ? "board" : (stock.indexOf("c:") === 0 || stock === "new:cons") ? "consumables" : ""; }
+function targetOf(stock){ return !stock ? "" : stock === "new:tool" ? "tools" : (stock.indexOf("b:") === 0 || stock === "new:board") ? "board" : (stock.indexOf("c:") === 0 || stock === "new:cons") ? "consumables" : ""; }
 function stockLabel(line){
   if(line.stock === "none") return "Not stock (nothing added)";
   if(!line.stock) return "⚠ Not linked to stock yet — edit the order to link it";
   if(line.stock === "new:board") return "NEW board: " + ((line.nf && line.nf.description) || line.desc || line.text || "");
   if(line.stock === "new:cons") return "NEW consumable: " + ((line.nf && line.nf.name) || line.desc || line.text || "");
+  if(line.stock === "new:tool") return "🔧 Tool → Tools app: " + ((line.nf && line.nf.name) || line.desc || line.text || "");
   var i = stockById(line.stock); return i ? i.label : (line.stockLabel || "(item removed)");
 }
 // Consumables counted in packs (e.g. screws per 500) can be ordered per pack or per single item.
@@ -818,6 +847,7 @@ function unitOf(line){
   if(packSizeOf(line)) return line.per === "each" ? "each (single)" : "pack(s) of " + packSizeOf(line);
   if(line.stock === "new:board") return "EA";
   if(line.stock === "new:cons") return UNITS[(line.nf||{}).unit] || "each";
+  if(line.stock === "new:tool") return "each";
   var i = stockById(line.stock); return i ? i.unit : (line.unit || "");
 }
 // Match a supplier line to a stock item in either app. Best of the two wins.
@@ -1179,6 +1209,7 @@ function stockOptions(sel){
   var o = '<option value=""' + (!sel?" selected":"") + '>— Pick the board / consumable —</option><option value="none"' + (sel==="none"?" selected":"") + '>Not stock (e.g. delivery fee)</option>';
   if(canBoard(user)) o += '<option value="new:board"' + (sel==="new:board"?" selected":"") + '>＋ New board…</option>';
   if(canCons(user)) o += '<option value="new:cons"' + (sel==="new:cons"?" selected":"") + '>＋ New consumable…</option>';
+  o += '<option value="new:tool"' + (sel==="new:tool"?" selected":"") + '>🔧 Tool — goes into the Tools app…</option>';
   if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
   if(canCons(user)) o += '<optgroup label="Consumables">' + consItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
   return o;
@@ -1191,6 +1222,8 @@ function newFieldsHtml(l){
     '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div>' +
     (n.unit === "per500" ? f("bundle","Items per pack",n.bundle || "500","500") : '') +
     (n.unit === "tin" ? '<div><label>Tin size</label><select data-nf="' + k + '" data-f="tinsize"><option value="">— pick —</option>' + TIN_SIZES.map(function(z){ return '<option' + (n.tinsize===z?" selected":"") + '>' + z + '</option>'; }).join("") + '</select></div>' : '') + '</div>';
+  if(l.stock === "new:tool") return '<div class="newf">' + f("name","Tool name (as it shows in Tools)",n.name,"Makita 18V drill") + f("category","Category",n.category,"Power tools") +
+    '<div class="small muted" style="grid-column:1/-1">When it is received, each one is added to the Tools app at that location, ready to be signed out.</div></div>';
   return "";
 }
 function lineCls(l){ if(!l.stock) return "check"; if(l.stock === "none") return "skip"; if(l.stock.indexOf("new:") === 0) return "new"; return (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok"; }
@@ -1463,6 +1496,8 @@ async function saveDraft(){
     if(l.stock === "new:board" && !(l.nf && l.nf.description)) { toast("Give the new board a name.", "err"); return; }
     if(l.stock === "new:cons" && !(l.nf && l.nf.name)) { toast("Give the new consumable a name.", "err"); return; }
     if(l.stock === "new:cons" && l.nf.unit === "tin" && !l.nf.tinsize) { toast("Pick the tin size for " + l.nf.name + ".", "err"); return; }
+    if(l.stock === "new:tool" && !(l.nf && l.nf.name)) { toast("Give the tool a name.", "err"); return; }
+    if(l.stock === "new:tool" && Math.round(num(l.qty)) !== num(l.qty)) { toast("Tools are counted one by one — use a whole number for " + l.nf.name + ".", "err"); return; }
     if(!l.text && !l.desc && !l.stock){ toast("A hand-typed line needs a description or a stock item.", "err"); return; }
   }
   if(isNewSupplier(d.supplier) && !d.newSupTo){ toast(d.supplier + " is a new supplier — choose which app to add it to (top of the page).", "err"); window.scrollTo(0, 0); return; }
@@ -1537,6 +1572,36 @@ async function addBoards(items, loc, who, reason){
   });
   if(!res.committed) throw new Error("Board Stock didn't load — check your connection and try again.");
 }
+// Tools bought on an order (2026-10-10): each one received becomes a tool in the Tools app at that
+// location ("in", ready to sign out), remembering which order it came from.
+async function addTools(items, loc, who, supplier){
+  var upd = {}, log = {}, ts = new Date().toISOString(), n = 0;
+  items.forEach(function(x){
+    var o = D.orders[x.oid] || {}, nf = x.line.nf || {}, name = nf.name || x.line.desc || x.line.text || "Tool", q = Math.round(num(x.qty));
+    for(var k = 0; k < q; k++){
+      var id = uid() + (n++);
+      upd[id] = { name:name, number:"", category:nf.category || "", location:loc, status:"in", added:ts,
+        fromOrder:{ oid:x.oid, lid:x.lid, po:o.po || "", ref:o.ref || "", supplier:supplier || o.supplier || "", price:num(x.line.price) || 0 } };
+      log[uid() + "t" + n] = { ts:ts, toolId:id, toolName:name, action:"added", by:who, location:loc, note:"Received on " + (o.po ? "PO " + o.po : "order " + (o.ref || "")) + (supplier ? " from " + supplier : "") };
+    }
+  });
+  if(!Object.keys(upd).length) return;
+  await db.ref("tools/items").update(upd);
+  await db.ref("tools/log").update(log);
+}
+// Taking tools back off (a delivery was corrected): removes the newest ones from that order line that are still in the store.
+async function removeTools(items, who){
+  if(!items.length) return;
+  var all = (await db.ref("tools/items").once("value")).val() || {}, upd = {}, log = {}, ts = new Date().toISOString(), short = [];
+  items.forEach(function(x){
+    var ids = Object.keys(all).filter(function(id){ var t = all[id]; return t && !upd[id] && t.fromOrder && t.fromOrder.oid === x.oid && t.fromOrder.lid === x.lid && (t.status || "in") === "in"; })
+      .sort(function(a, b){ return String(all[b].added).localeCompare(String(all[a].added)); }).slice(0, Math.round(x.qty));
+    if(ids.length < Math.round(x.qty)) short.push((Math.round(x.qty) - ids.length) + " × " + ((x.line.nf && x.line.nf.name) || x.line.desc || "tool"));
+    ids.forEach(function(id){ upd[id] = null; log[uid() + id] = { ts:ts, toolId:id, toolName:all[id].name, action:"removed", by:who, location:all[id].location || "", note:"Delivery corrected — not received" }; });
+  });
+  if(Object.keys(upd).length){ await db.ref("tools/items").update(upd); await db.ref("tools/log").update(log); }
+  if(short.length) toast("Some tools are signed out or in repair, so they weren't removed: " + short.join(", ") + ". Remove them in the Tools app.", "err");
+}
 async function addCons(items, loc){
   var base = "consumablesStock/";
   for(var i = 0; i < items.length; i++){
@@ -1587,6 +1652,7 @@ async function saveReceive(){
   try{
     await addBoards(items.filter(function(x){ return x.t === "board"; }), loc, who, reason);
     await addCons(items.filter(function(x){ return x.t === "consumables"; }), loc);
+    await addTools(items.filter(function(x){ return x.t === "tools"; }).map(function(x){ return { oid:x.c.oid, lid:x.c.lid, line:x.c.line, qty:x.qty }; }), loc, who, r.supplier);
     var fileUrl = r.file ? await uploadDoc("orderDocs", did, r.file) : "";
     var ts = new Date().toISOString();
     for(var oid in byOrder){
@@ -1607,7 +1673,7 @@ async function saveReceive(){
     }
     // learn the delivery note wording for next time (Stock In uses the same memory)
     var upd = { board:{}, consumables:{} };
-    items.forEach(function(x){ var s = x.newStock || x.stock; if(!s || !x.src || !x.src.text) return; var k = L.aliasKey(x.src);
+    items.forEach(function(x){ var s = x.newStock || x.stock; if(!s || x.t === "tools" || !x.src || !x.src.text) return; var k = L.aliasKey(x.src);
       if(k) upd[x.t][fbKey(k)] = { itemId:s.replace(/^[bc]:/, ""), text:String(x.src.text).slice(0,160) }; });
     for(var t in upd) if(Object.keys(upd[t]).length) await db.ref("stockIn/aliases/" + t).update(upd[t]);
     await db.ref("stockIn/receipts/" + did).set({ ts:ts, user:who, target: items.every(function(x){ return x.t === "board"; }) ? "board" : "consumables", location:loc, supplier:r.supplier,
@@ -1668,6 +1734,8 @@ function fixDeliveryModal(o, did){
       var ub = up.filter(function(c){ return c.t === "board"; }).map(function(c){ return { c:c, qty:c.diff, stock:c.l.stock, nf:c.l.nf || null }; });
       var uc = up.filter(function(c){ return c.t === "consumables"; }).map(function(c){ return { c:c, qty:c.diff, sq:toStockQty(c.l, c.diff), stock:c.l.stock, nf:c.l.nf || null }; });
       await addBoards(ub, loc, who, reason); await addCons(uc, loc);
+      await addTools(up.filter(function(c){ return c.t === "tools"; }).map(function(c){ return { oid:o.id, lid:c.lid, line:c.l, qty:c.diff }; }), loc, who, o.supplier);
+      await removeTools(down.filter(function(c){ return c.t === "tools"; }).map(function(c){ return { oid:o.id, lid:c.lid, line:c.l, qty:-c.diff }; }), who);
       ub.concat(uc).forEach(function(x){ if(x.newStock && x.newStock !== x.stock) x.c.newStock = x.newStock; });
       var res = await db.ref("orders/list/" + o.id).transaction(function(cur){
         if(!cur || !cur.deliveries || !cur.deliveries[did]) return;
@@ -2184,6 +2252,7 @@ function bind(){
     qa("[data-stock]").forEach(function(s){ s.onchange = function(){ readDraftFields(); var l = draftLine(s.getAttribute("data-stock")); l.stock = s.value; l.how = "picked"; l.score = 1;
       if(l.stock === "new:board" && !l.nf) l.nf = { description:l.desc || l.text || "", category:l.size || "" };
       if(l.stock === "new:cons" && !l.nf) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), unit:"each" };
+      if(l.stock === "new:tool" && (!l.nf || l.nf.unit)) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), category:"" };
       l.per = guessPer(l);
       render(); }; });
     qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; readDraftFields(); render(); }; });

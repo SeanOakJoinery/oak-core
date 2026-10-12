@@ -158,20 +158,24 @@ table.ol tr.full td{color:var(--muted)}
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script>
-/* Oak Joinery — Firebase sign-in guard (2026-10-07).
-   The database is being locked so only signed-in apps can read or write it
-   (Firebase warned that anyone with the address could). Staff still only use
-   their PIN: every app signs in to Firebase anonymously in the background.
-   Every database call (on / once / set / update / push / remove / transaction)
-   waits until that app's sign-in has finished, so nothing is refused while
-   the sign-in is still happening. If anonymous sign-in isn't switched on yet,
-   or takes too long, the calls carry on as before — so this file is safe to
-   upload before the new database rules go in. */
+/* Oak Joinery — Firebase sign-in guard (v2, 2026-10-10: PIN lock).
+   Every app signs in to Firebase anonymously in the background, and every
+   database call (on / once / set / update / push / remove / transaction)
+   waits until that sign-in has finished.
+   PIN lock: once signed in, if someone is logged in on this device (the
+   shared Oak session: user id + PIN hash), this device is registered under
+   oakSessions/<its Firebase id>. The database rules only let a device read or
+   write when that registration matches the user's PIN in the locked pins/
+   store — so an outsider who only has the app's public key gets nothing.
+   If the registration is refused (PIN changed, user removed) the person is
+   sent back to the menu to log in again. If anonymous sign-in fails or takes
+   too long, the calls carry on as before. */
 (function(){
   "use strict";
   if (window.__oakAuthGuard || !window.firebase || !firebase.database) return;
-  window.__oakAuthGuard = true;
+  window.__oakAuthGuard = 2;
   var state = {};   // app name -> { ready, queue }
+  var set0 = null;  // the real Reference.set (before it is made to wait)
   function appOf(ref){
     try { return (ref && ref.database && ref.database.app) || firebase.app(); } catch (e) { return null; }
   }
@@ -185,13 +189,36 @@ table.ol tr.full td{color:var(--muted)}
     var q = s.queue; s.queue = [];
     q.forEach(function(f){ try { f(); } catch (e) { console.error(e); } });
   }
+  function localSession(){
+    try { var x = JSON.parse(localStorage.getItem("oakSession")); return x && x.id && x.pin && x.exp && Date.now() < x.exp ? x : null; } catch (e) { return null; }
+  }
+  function denied(e){ return /permission/i.test(String((e && (e.code || e.message)) || e)); }
+  function rejected(){
+    try { localStorage.removeItem("oakSession"); } catch (e) {}
+    try { window.dispatchEvent(new Event("oak-session-rejected")); } catch (e) {}
+    if (!/\/oak-core\/?(index\.html)?$/.test(location.pathname)) location.href = "/oak-core/?logout=1";
+  }
+  // Register this device's sign-in for the logged-in person, then let the queued calls go.
+  function register(app, u, s){
+    var x = localSession();
+    if (!x || !set0) { release(s); return; }
+    var done = false, t = setTimeout(function(){ if (!done) { done = true; release(s); } }, 8000);
+    var ref = firebase.database(app).ref("oakSessions/" + u.uid);
+    set0.call(ref, { user:String(x.id), pin:String(x.pin), ts:firebase.database.ServerValue.TIMESTAMP }).then(function(){
+      if (!done) { done = true; clearTimeout(t); release(s); }
+    }, function(e){
+      console.warn("Oak: this device's login was refused (" + ((e && e.code) || e) + ")");
+      if (!done) { done = true; clearTimeout(t); release(s); }
+      if (denied(e)) rejected();
+    });
+  }
   function signIn(app, s){
     if (!app || !firebase.auth) { release(s); return; }
     var a; try { a = firebase.auth(app); } catch (e) { release(s); return; }
     var timer = setTimeout(function(){ console.warn("Oak: Firebase sign-in is slow — carrying on"); release(s); }, 8000);
-    var asked = false;
+    var asked = false, seen = false;
     a.onAuthStateChanged(function(u){
-      if (u) { clearTimeout(timer); release(s); return; }
+      if (u) { if (seen) return; seen = true; clearTimeout(timer); register(app, u, s); return; }
       if (asked) return; asked = true;
       a.signInAnonymously().catch(function(e){ console.warn("Oak: anonymous sign-in not available (" + (e && e.code) + ")"); clearTimeout(timer); release(s); });
     });
@@ -203,6 +230,7 @@ table.ol tr.full td{color:var(--muted)}
   }
   var DB = firebase.database, Q = DB.Query && DB.Query.prototype, R = DB.Reference && DB.Reference.prototype;
   if (!Q || !R) return;
+  set0 = R.set;
   var on0 = Q.on, off0 = Q.off;
   Q.on = function(ev, cb){ var self = this, a = arguments; when(self, function(){ on0.apply(self, a); }); return cb; };
   Q.off = function(){ var self = this, a = arguments; when(self, function(){ off0.apply(self, a); }); };
@@ -217,7 +245,7 @@ table.ol tr.full td{color:var(--muted)}
   };
 })();
 </script>
-<script src="../oak-core.js?v=3"></script>
+<script src="../oak-core.js?v=4"></script>
 <script>
 (function(){
 "use strict";
@@ -273,7 +301,7 @@ function render(){
   var q = ui.search.trim().toLowerCase();
   var list = team().filter(function(u){ return !q || u.username.toLowerCase().indexOf(q) >= 0; })
     .sort(function(a,b){ return (isMain(b) - isMain(a)) || (!!b.isRoot - !!a.isRoot) || a.username.localeCompare(b.username); });
-  var h = '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="addUser">＋ Add user</button></div>' +
+  var h = (iAmMain() ? secCard() : '') + '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="addUser">＋ Add user</button></div>' +
     '<div class="card"><input id="search" placeholder="Search people…" value="' + esc(ui.search) + '" style="margin-bottom:12px">' +
     '<div class="ulist">' + list.map(function(u){
       var tag = isMain(u) ? '<span class="pill main">Main root — everything</span>' : u.isRoot ? '<span class="pill root">Root</span>' : '';
@@ -287,6 +315,7 @@ function render(){
   root.innerHTML = h;
   var s = document.getElementById("search");
   s.oninput = function(){ ui.search = this.value; var p = this.selectionStart; render(); var n = document.getElementById("search"); n.focus(); try{ n.setSelectionRange(p, p); }catch(e){} };
+  bindSec();
   document.getElementById("addUser").onclick = function(){ ui.editId = "new"; render(); window.scrollTo(0,0); };
   document.querySelectorAll("[data-edit]").forEach(function(b){ b.onclick = function(){ ui.editId = b.getAttribute("data-edit"); render(); window.scrollTo(0,0); }; });
 }
@@ -338,7 +367,8 @@ async function save(u){
   if(u && isMain(u) && !main){ toast("Only the main root can edit the main root account.", "err"); return; }
   var rec = u ? JSON.parse(JSON.stringify(u)) : { id:uid(), permissions:{}, apps:{} };
   rec.username = name;
-  if(pin) rec.pin = await OakCore.hashPin(pin);
+  // PIN lock (2026-10-10): the PIN goes into the locked store, never into the shared user list
+  if(pin){ try{ await OakCore.setPin(rec.id, pin); }catch(e){ toast("Couldn't save the PIN: " + (e.message || e), "err"); return; } delete rec.pin; }
   if(!isMain(rec)){
     rec.permissions = rec.permissions || {};
     Object.keys(LABELS).forEach(function(k){ if(rec.permissions[k] === undefined) rec.permissions[k] = false; });
@@ -363,9 +393,81 @@ async function removeUser(u){
   if(u.isRoot && !iAmMain()){ toast("Only the main root can remove a root account.", "err"); return; }
   if(!confirm("Remove " + u.username + "? They won't be able to log in any more.")) return;
   busy = true;
-  try{ await core.saveUsers(list.filter(function(x){ return x.id !== u.id; })); toast(u.username + " removed.", "ok"); ui.editId = null; }
+  try{ await core.saveUsers(list.filter(function(x){ return x.id !== u.id; })); OakCore.removePin(u.id); toast(u.username + " removed.", "ok"); ui.editId = null; }
   catch(e){ toast("Couldn't remove: " + (e.message || e), "err"); }
   busy = false; render();
+}
+
+// ---------- PIN lock (2026-10-10) ----------
+// PINs move out of the shared user list into pins/<id>, which nobody can read; the
+// database rules only let in a device that logged in with a real PIN. Step 1 (before
+// the new rules): copy every PIN into the locked store. Step 2: Sean pastes the new
+// rules in Firebase. Step 3 (this page notices the rules are on): the PINs are taken
+// out of the shared user list. The email jobs log in with their own key ("robot").
+var sec = { state:"?", n:0, robotAt:null, working:false, newKey:"" };
+function denied(e){ return /permission/i.test(String((e && (e.code || e.message)) || e)); }
+async function secCheck(){
+  if(!iAmMain() || sec.working) return;
+  sec.working = true;
+  var db = firebase.database(), withPin = team().filter(function(u){ return u.pin; });
+  try{
+    var pins = (await db.ref("pins").once("value")).val() || {};   // only readable before the new rules
+    for(var i = 0; i < withPin.length; i++) if(pins[withPin[i].id] !== withPin[i].pin) await db.ref("pins/" + withPin[i].id).set(withPin[i].pin);
+    sec.state = "ready"; sec.n = withPin.length; if(pins.robot) sec.robotAt = sec.robotAt || "set";
+  }catch(e){
+    if(!denied(e)){ sec.state = "error"; sec.err = e.message || String(e); }
+    else {
+      sec.state = "on";
+      if(withPin.length){
+        try{
+          for(var j = 0; j < withPin.length; j++) await db.ref("pins/" + withPin[j].id).set(withPin[j].pin);
+          await core.getDispatchBoardRef().child("users").transaction(function(cur){
+            if(!cur) return cur;
+            Object.keys(cur).forEach(function(k){ if(cur[k] && cur[k].pin !== undefined) delete cur[k].pin; });
+            return cur;
+          });
+          toast("PIN lock: " + withPin.length + " PIN" + (withPin.length === 1 ? "" : "s") + " taken out of the shared user list.", "ok");
+        }catch(e2){ sec.state = "error"; sec.err = e2.message || String(e2); }
+      }
+    }
+  }
+  try{ var at = (await db.ref("security/robotKeyAt").once("value")).val(); if(at) sec.robotAt = at; }catch(e3){}
+  sec.working = false; render();
+}
+function secCard(){
+  var h = '<div class="card" style="border-color:var(--amber)"><h2 style="margin-top:0">🔒 PIN lock</h2>';
+  if(sec.state === "?") h += '<p class="small muted">Checking…</p>';
+  else if(sec.state === "error") h += '<p class="small" style="color:#E39A80">Couldn\'t check: ' + esc(sec.err || "") + '</p>';
+  else if(sec.state === "ready") h += '<p class="small"><b>Step 1 ✓</b> All ' + sec.n + ' PINs are copied into the locked store.</p>' +
+    '<p class="small"><b>Step 2:</b> switch on the new database rules in Firebase (Realtime Database → Rules) — the text is in <b>Firebase PIN-lock rules</b> in your New folder. Then open this page again: it takes the PINs out of the shared user list by itself.</p>';
+  else h += '<p class="small"><b>The PIN lock is on.</b> Only phones and PCs that logged in with a real PIN can open the data, and PINs are kept where nobody can read them.</p>';
+  h += '<div class="small" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line, #3a352e)"><b>Email jobs key</b> (weekly reorder email &amp; orders check): ' +
+    (sec.robotAt ? 'set' + (sec.robotAt !== "set" ? ' on ' + esc(new Date(sec.robotAt).toLocaleDateString("en-ZA", { day:"2-digit", month:"short", year:"numeric" })) : '') : '<span style="color:var(--amber)">not set yet — needed once the PIN lock is on</span>') +
+    ' <button class="btn btn-sm" id="robotKey" style="margin-left:6px">' + (sec.robotAt ? 'Make a new key' : 'Make the key') + '</button></div>';
+  if(sec.newKey) h += '<div style="margin-top:10px;padding:10px;border:1px dashed var(--amber);border-radius:10px"><div class="small">Copy this key into GitHub now — it is shown only once:</div>' +
+    '<div style="font-family:monospace;font-size:15px;margin:8px 0;word-break:break-all;user-select:all" id="robotKeyTxt">' + esc(sec.newKey) + '</div>' +
+    '<button class="btn btn-sm" id="robotCopy">Copy</button> <button class="btn btn-sm" id="robotDone">Done — hide it</button>' +
+    '<ol class="small" style="margin:8px 0 0 18px;line-height:1.6"><li>Open github.com/SeanOakJoinery/Board-Stock-Take → Settings → Secrets and variables → Actions.</li><li>New repository secret (or edit it if it is there): name <b>OAK_ROBOT_KEY</b>, value: the key above.</li><li>Save.</li></ol></div>';
+  return h + '</div>';
+}
+function bindSec(){
+  var b = document.getElementById("robotKey");
+  if(b) b.onclick = async function(){
+    if(!freshUser() || !iAmMain()) return;
+    if(sec.robotAt && !confirm("Make a new key? The email jobs stop working until you put the new key into GitHub.")) return;
+    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789", a = new Uint8Array(28); crypto.getRandomValues(a);
+    var key = Array.prototype.map.call(a, function(x){ return chars[x % chars.length]; }).join("");
+    try{
+      await firebase.database().ref("pins/robot").set(await OakCore.hashPin(key));
+      sec.robotAt = new Date().toISOString();
+      await firebase.database().ref("security/robotKeyAt").set(sec.robotAt);
+      sec.newKey = key; render();
+    }catch(e){ toast("Couldn't save the key: " + (e.message || e), "err"); }
+  };
+  var c = document.getElementById("robotCopy");
+  if(c) c.onclick = function(){ try{ navigator.clipboard.writeText(sec.newKey).then(function(){ toast("Key copied.", "ok"); }); }catch(e){ toast("Select the key and copy it.", "err"); } };
+  var d = document.getElementById("robotDone");
+  if(d) d.onclick = function(){ sec.newKey = ""; render(); };
 }
 
 // ---------- start ----------
@@ -376,6 +478,7 @@ try{
     if(r.status === "wait") return;
     if(r.status !== "ok"){ S.goHome({ next:"users" }); return; }
     user = r.user; document.getElementById("who").textContent = user.username;
+    if(sec.state === "?" || (sec.state !== "error" && users.some(function(u){ return u && u.pin; }))) setTimeout(secCheck, 0);
     if(!busy && !ui.editId) render(); else if(!busy && ui.editId && !document.getElementById("fName")) render();
   });
 }catch(e){ document.getElementById("app").innerHTML = '<div class="card"><h2>Could not start</h2><p class="muted">' + esc(e.message || String(e)) + '</p></div>'; }

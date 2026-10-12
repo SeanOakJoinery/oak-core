@@ -146,20 +146,24 @@ table.ol tr.full td{color:var(--muted)}
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script>
-/* Oak Joinery — Firebase sign-in guard (2026-10-07).
-   The database is being locked so only signed-in apps can read or write it
-   (Firebase warned that anyone with the address could). Staff still only use
-   their PIN: every app signs in to Firebase anonymously in the background.
-   Every database call (on / once / set / update / push / remove / transaction)
-   waits until that app's sign-in has finished, so nothing is refused while
-   the sign-in is still happening. If anonymous sign-in isn't switched on yet,
-   or takes too long, the calls carry on as before — so this file is safe to
-   upload before the new database rules go in. */
+/* Oak Joinery — Firebase sign-in guard (v2, 2026-10-10: PIN lock).
+   Every app signs in to Firebase anonymously in the background, and every
+   database call (on / once / set / update / push / remove / transaction)
+   waits until that sign-in has finished.
+   PIN lock: once signed in, if someone is logged in on this device (the
+   shared Oak session: user id + PIN hash), this device is registered under
+   oakSessions/<its Firebase id>. The database rules only let a device read or
+   write when that registration matches the user's PIN in the locked pins/
+   store — so an outsider who only has the app's public key gets nothing.
+   If the registration is refused (PIN changed, user removed) the person is
+   sent back to the menu to log in again. If anonymous sign-in fails or takes
+   too long, the calls carry on as before. */
 (function(){
   "use strict";
   if (window.__oakAuthGuard || !window.firebase || !firebase.database) return;
-  window.__oakAuthGuard = true;
+  window.__oakAuthGuard = 2;
   var state = {};   // app name -> { ready, queue }
+  var set0 = null;  // the real Reference.set (before it is made to wait)
   function appOf(ref){
     try { return (ref && ref.database && ref.database.app) || firebase.app(); } catch (e) { return null; }
   }
@@ -173,13 +177,36 @@ table.ol tr.full td{color:var(--muted)}
     var q = s.queue; s.queue = [];
     q.forEach(function(f){ try { f(); } catch (e) { console.error(e); } });
   }
+  function localSession(){
+    try { var x = JSON.parse(localStorage.getItem("oakSession")); return x && x.id && x.pin && x.exp && Date.now() < x.exp ? x : null; } catch (e) { return null; }
+  }
+  function denied(e){ return /permission/i.test(String((e && (e.code || e.message)) || e)); }
+  function rejected(){
+    try { localStorage.removeItem("oakSession"); } catch (e) {}
+    try { window.dispatchEvent(new Event("oak-session-rejected")); } catch (e) {}
+    if (!/\/oak-core\/?(index\.html)?$/.test(location.pathname)) location.href = "/oak-core/?logout=1";
+  }
+  // Register this device's sign-in for the logged-in person, then let the queued calls go.
+  function register(app, u, s){
+    var x = localSession();
+    if (!x || !set0) { release(s); return; }
+    var done = false, t = setTimeout(function(){ if (!done) { done = true; release(s); } }, 8000);
+    var ref = firebase.database(app).ref("oakSessions/" + u.uid);
+    set0.call(ref, { user:String(x.id), pin:String(x.pin), ts:firebase.database.ServerValue.TIMESTAMP }).then(function(){
+      if (!done) { done = true; clearTimeout(t); release(s); }
+    }, function(e){
+      console.warn("Oak: this device's login was refused (" + ((e && e.code) || e) + ")");
+      if (!done) { done = true; clearTimeout(t); release(s); }
+      if (denied(e)) rejected();
+    });
+  }
   function signIn(app, s){
     if (!app || !firebase.auth) { release(s); return; }
     var a; try { a = firebase.auth(app); } catch (e) { release(s); return; }
     var timer = setTimeout(function(){ console.warn("Oak: Firebase sign-in is slow — carrying on"); release(s); }, 8000);
-    var asked = false;
+    var asked = false, seen = false;
     a.onAuthStateChanged(function(u){
-      if (u) { clearTimeout(timer); release(s); return; }
+      if (u) { if (seen) return; seen = true; clearTimeout(timer); register(app, u, s); return; }
       if (asked) return; asked = true;
       a.signInAnonymously().catch(function(e){ console.warn("Oak: anonymous sign-in not available (" + (e && e.code) + ")"); clearTimeout(timer); release(s); });
     });
@@ -191,6 +218,7 @@ table.ol tr.full td{color:var(--muted)}
   }
   var DB = firebase.database, Q = DB.Query && DB.Query.prototype, R = DB.Reference && DB.Reference.prototype;
   if (!Q || !R) return;
+  set0 = R.set;
   var on0 = Q.on, off0 = Q.off;
   Q.on = function(ev, cb){ var self = this, a = arguments; when(self, function(){ on0.apply(self, a); }); return cb; };
   Q.off = function(){ var self = this, a = arguments; when(self, function(){ off0.apply(self, a); }); };
@@ -205,7 +233,7 @@ table.ol tr.full td{color:var(--muted)}
   };
 })();
 </script>
-<script src="../oak-core.js?v=3"></script>
+<script src="../oak-core.js?v=4"></script>
 <script>
 (function(){
 "use strict";
@@ -282,7 +310,8 @@ function viewTool(t){
   var h = '<button class="backlink" id="back">← All tools</button><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(t.name) + '</h2>' + statusPill(t) + '</div>' +
     '<div class="kv" style="margin-top:10px"><div>Number</div><div>' + esc(t.number || "—") + '</div><div>Category</div><div>' + esc(t.category || "—") + '</div><div>Location</div><div>' + esc(t.location || "—") + '</div>' +
     (t.status === "out" && t.out ? '<div>Signed out to</div><div>' + esc(t.out.to) + ' · ' + when(t.out.ts) + (t.out.note ? ' · ' + esc(t.out.note) : '') + '</div>' : '') +
-    (t.status === "repair" && t.repairNote ? '<div>Problem</div><div>' + esc(t.repairNote) + '</div>' : '') + '</div>' +
+    (t.status === "repair" && t.repairNote ? '<div>Problem</div><div>' + esc(t.repairNote) + '</div>' : '') +
+    (t.fromOrder ? '<div>Bought</div><div>' + esc([t.fromOrder.po ? "PO " + t.fromOrder.po : (t.fromOrder.ref || ""), t.fromOrder.supplier, t.added ? when(t.added) : ""].filter(Boolean).join(" · ")) + (t.fromOrder.price ? ' · R ' + esc(Number(t.fromOrder.price).toFixed(2)) + ' excl. VAT' : '') + '</div>' : '') + '</div>' +
     '<div class="row" style="margin-top:14px">' + ((t.status || "in") === "in" ? '<button class="btn btn-primary" data-out="' + esc(t.id) + '">Sign out</button>' : t.status === "out" ? '<button class="btn btn-primary" data-in="' + esc(t.id) + '">Sign in</button>' : (isRoot() ? '<button class="btn" data-fixed="' + esc(t.id) + '">Mark repaired</button>' : '')) +
     (isRoot() ? '<button class="btn" id="editTool">Edit</button><button class="btn" id="delTool" style="color:#E39A80">Remove</button>' : '') + '</div></div>' +
     '<div class="card"><h2>History</h2>' + logHtml(toolLog(t.id), false) + '</div>';
