@@ -772,7 +772,19 @@ function fbKey(s){ return String(s).replace(/[.#$\[\]\/]/g, "_"); }
 // Prices on orders (2026-10-06): unit price excl. VAT, read off the quotation or typed in.
 var VAT_RATE = 0.15;
 function money(n){ n = Number(n) || 0; return "R " + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
-function lineAmt(l){ return Math.round(num(l.qty) * num(l.price) * 100) / 100; }
+function lineAmt(l){ return Math.round((l.priceBy === "m3" ? lineM3(l) : num(l.qty)) * num(l.price) * 100) / 100; }
+// Solid wood bought in lengths but priced per m³ (e.g. Country Woods SA Pine 152x38 x 3.0 m @ R7 500/m³), 2026-10-13.
+// m³ = pieces × thickness × width × length; the supplier's own m³ figure can be typed over it.
+function solidPcsInfo(l){
+  if(!l) return null;
+  if(l.stock === "new:solid"){ var n = l.nf || {}; return (n.unit || "pcs") === "pcs" ? { t:num(n.thickness), w:num(n.width), len:num(n.length) } : null; }
+  if(!l.stock || l.stock.indexOf("b:") !== 0) return null;
+  var code = l.stock.slice(2), b = list(D.board && D.board.boards).find(function(x){ return x.code === code; });
+  return b && b.kind === "solid" && (b.unit || "pcs") === "pcs" ? { t:num(b.thickness), w:num(b.width), len:num(b.length) } : null;
+}
+function m3Each(l){ var i = solidPcsInfo(l); return i && i.t && i.w && i.len ? i.t * i.w * i.len / 1e6 : 0; }
+function lineM3(l){ return l.m3 !== "" && l.m3 != null ? num(l.m3) : Math.round(num(l.qty) * m3Each(l) * 1000) / 1000; }
+function priceNote(l){ return l.priceBy === "m3" ? " /m³" : ""; }
 function hasPrices(lines){ return lines.some(function(l){ return num(l.price) > 0; }); }
 // VAT worked out per line and added up, the way suppliers' systems do it (so totals match their quotes to the cent)
 function orderTotals(lines){ var ex = 0, vat = 0; lines.forEach(function(l){ var a = lineAmt(l); ex += a; vat += Math.round(a * VAT_RATE * 100 + 1e-6) / 100; }); ex = Math.round(ex * 100) / 100; vat = Math.round(vat * 100) / 100; return { ex:ex, vat:vat, inc:Math.round((ex + vat) * 100) / 100 }; }
@@ -783,9 +795,14 @@ function num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
 function r2(n){ return Math.round(n * 100) / 100; }
 
 // ---------- stock items (Board Stock + Consumables) ----------
+// Solid wood counted in m³ or linear metres keeps decimals (2026-10-13)
+var SOLID_UNITS = { pcs:"pieces", "m³":"cubic metres (m³)", lm:"linear metres (lm)" };
+function solidDesc(n){ var t = n.thickness, w = n.width, l = n.length;
+  return String(n.species || "Solid wood").trim() + (t && w ? " " + t + "x" + w : t ? " " + t + "mm" : w ? " " + w + "mm wide" : "") + (l ? " · " + l + "m" : ""); }
+function solidDec(b){ return !!b && b.kind === "solid" && (b.unit === "m³" || b.unit === "lm"); }
 function boardItems(){
   return list(D.board && D.board.boards).map(function(b){
-    return { id:"b:" + b.code, target:"board", ref:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
+    return { id:"b:" + b.code, target:"board", solid:b.kind === "solid", ref:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
     .sort(function(a,b){ return a.label.localeCompare(b.label); });
 }
 function consItems(){
@@ -804,11 +821,12 @@ function stockById(id){
   var arr = id.indexOf("b:") === 0 ? boardItems() : consItems();
   return arr.find(function(i){ return i.id === id; }) || null;
 }
-function targetOf(stock){ return !stock ? "" : stock === "new:tool" ? "tools" : (stock.indexOf("b:") === 0 || stock === "new:board") ? "board" : (stock.indexOf("c:") === 0 || stock === "new:cons") ? "consumables" : ""; }
+function targetOf(stock){ return !stock ? "" : stock === "new:tool" ? "tools" : (stock.indexOf("b:") === 0 || stock === "new:board" || stock === "new:solid") ? "board" : (stock.indexOf("c:") === 0 || stock === "new:cons") ? "consumables" : ""; }
 function stockLabel(line){
   if(line.stock === "none") return "Not stock (nothing added)";
   if(!line.stock) return "⚠ Not linked to stock yet — edit the order to link it";
   if(line.stock === "new:board") return "NEW board: " + ((line.nf && line.nf.description) || line.desc || line.text || "");
+  if(line.stock === "new:solid") return "NEW solid wood: " + solidDesc(line.nf || {});
   if(line.stock === "new:cons") return "NEW consumable: " + ((line.nf && line.nf.name) || line.desc || line.text || "");
   if(line.stock === "new:tool") return "🔧 Tool → Tools app: " + ((line.nf && line.nf.name) || line.desc || line.text || "");
   var i = stockById(line.stock); return i ? i.label : (line.stockLabel || "(item removed)");
@@ -846,6 +864,7 @@ function unitOf(line){
   if(isTin(line)){ var ts = tinSizeOf(line); return line.per === "litre" ? "litres" : "tin(s)" + (ts ? " of " + ts : ""); }
   if(packSizeOf(line)) return line.per === "each" ? "each (single)" : "pack(s) of " + packSizeOf(line);
   if(line.stock === "new:board") return "EA";
+  if(line.stock === "new:solid") return (line.nf && line.nf.unit) || "pcs";
   if(line.stock === "new:cons") return UNITS[(line.nf||{}).unit] || "each";
   if(line.stock === "new:tool") return "each";
   var i = stockById(line.stock); return i ? i.unit : (line.unit || "");
@@ -1208,9 +1227,12 @@ function locationsAll(){
 function stockOptions(sel){
   var o = '<option value=""' + (!sel?" selected":"") + '>— Pick the board / consumable —</option><option value="none"' + (sel==="none"?" selected":"") + '>Not stock (e.g. delivery fee)</option>';
   if(canBoard(user)) o += '<option value="new:board"' + (sel==="new:board"?" selected":"") + '>＋ New board…</option>';
+  if(canBoard(user)) o += '<option value="new:solid"' + (sel==="new:solid"?" selected":"") + '>＋ New solid wood…</option>';
   if(canCons(user)) o += '<option value="new:cons"' + (sel==="new:cons"?" selected":"") + '>＋ New consumable…</option>';
   o += '<option value="new:tool"' + (sel==="new:tool"?" selected":"") + '>🔧 Tool — goes into the Tools app…</option>';
-  if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
+  var bopt = function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; };
+  if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().filter(function(i){ return !i.solid; }).map(bopt).join("") + '</optgroup>';
+  if(canBoard(user) && boardItems().some(function(i){ return i.solid; })) o += '<optgroup label="Solid wood">' + boardItems().filter(function(i){ return i.solid; }).map(bopt).join("") + '</optgroup>';
   if(canCons(user)) o += '<optgroup label="Consumables">' + consItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
   return o;
 }
@@ -1218,6 +1240,9 @@ function newFieldsHtml(l){
   var n = l.nf || {}, k = l.key;
   function f(name, lab, val, ph){ return '<div><label>' + lab + '</label><input data-nf="' + k + '" data-f="' + name + '" value="' + esc(val||"") + '" placeholder="' + esc(ph||"") + '"></div>'; }
   if(l.stock === "new:board") return '<div class="newf">' + f("description","Board name",n.description,"18mm White Melamine") + f("category","Size",n.category,"9x6") + '</div>';
+  if(l.stock === "new:solid") return '<div class="newf">' + f("species","Species / name",n.species,"American White Oak") + f("thickness","Thickness (mm)",n.thickness,"32") + f("width","Width (mm)",n.width,"150") + f("length","Length (m, optional)",n.length,"3.0") +
+    '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(SOLID_UNITS).map(function(u){ return '<option value="' + u + '"' + ((n.unit||"pcs")===u?" selected":"") + '>' + SOLID_UNITS[u] + '</option>'; }).join("") + '</select></div>' +
+    '<div class="small muted" style="grid-column:1/-1">Goes into Board Stock → Solid wood when it is received.</div></div>';
   if(l.stock === "new:cons") return '<div class="newf">' + f("name","Name",n.name,"4x30 chipboard screw") +
     '<div><label>Counted in</label><select data-nf="' + k + '" data-f="unit">' + Object.keys(UNITS).map(function(u){ return '<option value="' + u + '"' + (n.unit===u?" selected":"") + '>' + (u==="per500"?"packs":UNITS[u]) + '</option>'; }).join("") + '</select></div>' +
     (n.unit === "per500" ? f("bundle","Items per pack",n.bundle || "500","500") : '') +
@@ -1257,7 +1282,9 @@ function viewEdit(){
         '<div><input type="number" inputmode="decimal" min="0" step="any" data-qty="' + l.key + '" value="' + (l.qty||"") + '" placeholder="Qty">' + (isTin(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="tin"' + (l.per!=="litre"?" selected":"") + '>tins' + (tinSizeOf(l) ? ' (' + esc(tinSizeOf(l)) + ')' : '') + '</option><option value="litre"' + (l.per==="litre"?" selected":"") + '>litres</option></select>' :
           packSizeOf(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="pack"' + (l.per!=="each"?" selected":"") + '>packs (' + packSizeOf(l) + ')</option><option value="each"' + (l.per==="each"?" selected":"") + '>each</option></select>' : '<div class="unit">' + esc(unitOf(l)) + '</div>') + (num(l.received) ? '<div class="unit">' + l.received + ' in</div>' : '') + '</div>' +
         '<button class="x" type="button" title="Remove line" data-del="' + l.key + '">×</button></div>' +
-        '<div class="prow"><label>Unit price excl. VAT</label><span class="rprefix">R</span><input type="number" inputmode="decimal" min="0" step="0.01" data-price="' + l.key + '" value="' + (l.price === "" || l.price == null ? "" : esc(l.price)) + '" placeholder="0.00"><span class="amt" data-amt="' + l.key + '">' + (num(l.price) ? "= " + money(lineAmt(l)) : "") + '</span></div>' +
+        '<div class="prow"><label>' + (l.priceBy === "m3" ? "Price per m³ excl. VAT" : "Unit price excl. VAT") + '</label><span class="rprefix">R</span><input type="number" inputmode="decimal" min="0" step="0.01" data-price="' + l.key + '" value="' + (l.price === "" || l.price == null ? "" : esc(l.price)) + '" placeholder="0.00"><span class="amt" data-amt="' + l.key + '">' + (num(l.price) ? "= " + money(lineAmt(l)) : "") + '</span></div>' +
+        (solidPcsInfo(l) ? '<div class="prow"><label>Priced</label><select data-priceby="' + l.key + '" style="width:auto"><option value="">per piece</option><option value="m3"' + (l.priceBy === "m3" ? " selected" : "") + '>per m³</option></select>' +
+          (l.priceBy === "m3" ? '<input type="number" inputmode="decimal" min="0" step="any" data-m3="' + l.key + '" value="' + (l.m3 === "" || l.m3 == null ? "" : esc(l.m3)) + '" placeholder="' + (m3Each(l) ? (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) : "m³") + '" style="width:110px"><span class="small muted">m³ ' + (m3Each(l) ? '(blank = worked out from the size: ' + (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) + ')' : '— type the m³ from the quote') + '</span>' : '') + '</div>' : '') +
         newFieldsHtml(l) + '</div>';
     });
     h += '</div>';
@@ -1294,7 +1321,7 @@ function viewOrder(o){
   var pz = hasPrices(lines), tz = orderTotals(lines);
   h += '<div class="card"><h2>Lines</h2><div style="overflow-x:auto"><table class="ol"><thead><tr><th>Item</th><th class="n">Ordered</th>' + (pz ? '<th class="n">Unit price</th><th class="n">Amount</th>' : '') + '<th class="n">Received</th><th class="n">Still to come</th></tr></thead><tbody>' +
     lines.map(function(l){ var ot = outstanding(l);
-      return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + (l.size ? ' <span class="muted">· ' + esc(l.size) + '</span>' : '') + '<div class="sub">→ ' + esc(stockLabel(l)) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td>' + (pz ? '<td class="n">' + (num(l.price) ? money(l.price) : '—') + '</td><td class="n">' + (num(l.price) ? money(lineAmt(l)) : '—') + '</td>' : '') + '<td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
+      return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + (l.size ? ' <span class="muted">· ' + esc(l.size) + '</span>' : '') + '<div class="sub">→ ' + esc(stockLabel(l)) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td>' + (pz ? '<td class="n">' + (num(l.price) ? money(l.price) + priceNote(l) + (l.priceBy === "m3" ? '<div class="sub">' + lineM3(l) + ' m³</div>' : '') : '—') + '</td><td class="n">' + (num(l.price) ? money(lineAmt(l)) : '—') + '</td>' : '') + '<td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
     '</tbody></table></div>' + (pz ? '<div class="ptot">Total excl. VAT <b>' + money(tz.ex) + '</b> · VAT ' + money(tz.vat) + ' · <b>incl. VAT ' + money(tz.inc) + '</b></div>' : '') + '</div>';
   var dels = Object.keys(o.deliveries || {}).map(function(k){ return Object.assign({ id:k }, o.deliveries[k]); }).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); });
   h += '<div class="card"><h2>Deliveries</h2>' + (dels.length ? '<ul class="hist">' + dels.map(function(d){ var t = new Date(d.ts);
@@ -1494,6 +1521,7 @@ async function saveDraft(){
   if(!lines.length){ toast("Add at least one line with a quantity.", "err"); return; }
   for(var i = 0; i < lines.length; i++){ var l = lines[i];
     if(l.stock === "new:board" && !(l.nf && l.nf.description)) { toast("Give the new board a name.", "err"); return; }
+    if(l.stock === "new:solid" && !(l.nf && l.nf.species)) { toast("Give the new solid wood a species / name.", "err"); return; }
     if(l.stock === "new:cons" && !(l.nf && l.nf.name)) { toast("Give the new consumable a name.", "err"); return; }
     if(l.stock === "new:cons" && l.nf.unit === "tin" && !l.nf.tinsize) { toast("Pick the tin size for " + l.nf.name + ".", "err"); return; }
     if(l.stock === "new:tool" && !(l.nf && l.nf.name)) { toast("Give the tool a name.", "err"); return; }
@@ -1517,7 +1545,8 @@ async function saveDraft(){
     o.lines = {};
     lines.forEach(function(l, n){
       var lid = l.lid || uid() + n, st = stockById(l.stock);
-      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 100) / 100 : null };
+      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 100) / 100 : null,
+        priceBy: l.priceBy === "m3" && solidPcsInfo(l) ? "m3" : "", m3: l.priceBy === "m3" && solidPcsInfo(l) ? lineM3(l) : null, m3Set: l.priceBy === "m3" && l.m3 !== "" && l.m3 != null };
       if(l.nf && l.stock && l.stock.indexOf("new:") === 0) o.lines[lid].nf = l.nf;
     });
     if(o.status === "part" && orderOut(o) === 0) o.status = "received";
@@ -1554,17 +1583,23 @@ async function addBoards(items, loc, who, reason){
     cur.boards = list(cur.boards); cur.log = list(cur.log);
     var locs = (cur.locations && cur.locations.length) ? cur.locations : ["Main"], ts = new Date().toISOString();
     items.forEach(function(x){
-      var q = Math.round(x.qty), b;
+      var q, b;
       if(x.stock === "new:board"){
         b = cur.boards.find(function(y){ return sameBoard(y, x.nf); });
         if(!b){ b = { code:newBoardCode(cur.boards, x.nf.description), description:x.nf.description, category:x.nf.category||"", unit:"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId:"" }; cur.boards.push(b); }
+      } else if(x.stock === "new:solid"){
+        var sn = x.nf || {}, sd = solidDesc(sn);
+        b = cur.boards.find(function(y){ return y.kind === "solid" && String(y.description||"").toLowerCase() === sd.toLowerCase() && (y.unit||"pcs") === (sn.unit||"pcs"); });
+        if(!b){ b = { code:newBoardCode(cur.boards, "SW" + sd), kind:"solid", species:sn.species||"", thickness:sn.thickness||"", width:sn.width||"", length:sn.length||"", grade:"",
+          description:sd, category:"Solid wood", unit:sn.unit||"pcs", qty:{}, reorderLevel:0, reorderNotified:false, supplierId:"", stockType:"stock", job:"" }; cur.boards.push(b); }
       } else b = cur.boards.find(function(y){ return y.code === x.stock.slice(2); });
       if(!b) throw new Error("A board on this order was deleted in Board Stock — edit the order and pick it again.");
+      q = solidDec(b) ? Math.round(num(x.qty) * 1000) / 1000 : Math.round(x.qty);   // solid wood in m³ / lm keeps decimals
       x.newStock = "b:" + b.code;
       if(typeof b.qty === "number"){ var o = {}; o[locs[0]] = b.qty; b.qty = o; }
       if(!b.qty || typeof b.qty !== "object") b.qty = {};
-      b.qty[loc] = (Number(b.qty[loc])||0) + q;
-      var total = Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0);
+      b.qty[loc] = Math.round(((Number(b.qty[loc])||0) + q) * 1000) / 1000;
+      var total = Math.round(Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0) * 1000) / 1000;
       b.reorderNotified = total <= (Number(b.reorderLevel)||0);
       cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason });
     });
@@ -1775,8 +1810,8 @@ async function removeBoards(items, loc, who, reason){
     items.forEach(function(x){
       var b = cur.boards.find(function(y){ return "b:" + y.code === x.stock; }); if(!b) return;
       if(!b.qty || typeof b.qty !== "object") b.qty = {};
-      var q = Math.round(x.qty);
-      b.qty[loc] = Math.max(0, (Number(b.qty[loc])||0) - q);
+      var q = solidDec(b) ? Math.round(num(x.qty) * 1000) / 1000 : Math.round(x.qty);
+      b.qty[loc] = Math.max(0, Math.round(((Number(b.qty[loc])||0) - q) * 1000) / 1000);
       var total = Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0);
       b.reorderNotified = total <= (Number(b.reorderLevel)||0);
       cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"remove", qtyChange:-q, resultingQty:total, reason:reason });
@@ -2059,8 +2094,8 @@ function poDocHtml(o){
   return '<div id="poDoc">' + pages.map(function(pl, pi){
     return '<div class="po-page">' + head() + '<table class="po-items"><thead><tr><th>#</th><th class="n">Qty</th><th>Unit</th><th>Description</th>' + (PRICED ? '<th class="r">Unit price</th><th class="r">Amount</th>' : '') + '</tr></thead><tbody>' +
       pl.map(function(l, k){ var idx = startIdx[pi] + k + 1; var unit = unitOf(l) || ""; if(/^Not /.test(unit)) unit = "";
-        return '<tr><td>' + idx + '</td><td class="n"><b>' + num(l.qty) + '</b></td><td>' + esc(unit.replace(/ \(single\)/, "")) + '</td><td>' + esc(l.desc || l.text || stockLabel(l)) + (l.size ? ' <span class="po-size">' + esc(l.size) + '</span>' : '') + (l.code ? ' <span class="po-size">(' + esc(l.code) + ')</span>' : '') + '</td>' +
-          (PRICED ? '<td class="r">' + (num(l.price) ? money(l.price) : '') + '</td><td class="r">' + (num(l.price) ? money(lineAmt(l)) : '') + '</td>' : '') + '</tr>'; }).join("") +
+        return '<tr><td>' + idx + '</td><td class="n"><b>' + num(l.qty) + '</b></td><td>' + esc(unit.replace(/ \(single\)/, "")) + '</td><td>' + esc(l.desc || l.text || stockLabel(l)) + (l.size ? ' <span class="po-size">' + esc(l.size) + '</span>' : '') + (l.code ? ' <span class="po-size">(' + esc(l.code) + ')</span>' : '') + (l.priceBy === "m3" ? ' <span class="po-size">— ' + lineM3(l) + ' m³</span>' : '') + '</td>' +
+          (PRICED ? '<td class="r">' + (num(l.price) ? money(l.price) + priceNote(l) : '') + '</td><td class="r">' + (num(l.price) ? money(lineAmt(l)) : '') + '</td>' : '') + '</tr>'; }).join("") +
       '</tbody></table>' + (PRICED && pi === pages.length - 1 ? '<table class="po-tot"><tr><td>Subtotal (excl. VAT)</td><td>' + money(TT.ex) + '</td></tr><tr><td>VAT 15%</td><td>' + money(TT.vat) + '</td></tr><tr class="g"><td>Total (incl. VAT)</td><td>' + money(TT.inc) + '</td></tr></table>' : '') + foot(pi + 1) + '</div>'; }).join("") + '</div>';
 }
 function viewPo(o){
@@ -2149,10 +2184,30 @@ async function emailPo(o){
 }
 
 // ---------- events ----------
+// Board Stock → Solid wood → "Order these" (2026-10-13): opens a new order with the low items already on it,
+// e.g. #reorder=b:SWOAK32X150~12,b:SWASH~5 — the supplier comes from the items' supplier in Board Stock.
+var pendingReorder = "";
+function startReorder(){
+  var spec = pendingReorder; pendingReorder = "";
+  if(!spec || !user) return;
+  if(!canQuote()){ toast("You don't have permission to add orders — ask Sean.", "err"); return; }
+  var boards = list(D.board && D.board.boards), sups = (D.board && D.board.suppliers) || {}, sup = null;
+  editOrder(null);
+  spec.split(",").forEach(function(part){
+    var bits = part.split("~"), code = String(bits[0] || "").replace(/^b:/, ""), b = boards.find(function(x){ return x.code === code; });
+    if(!b) return;
+    if(!sup && b.supplierId && sups[b.supplierId]) sup = sups[b.supplierId];
+    draft.lines.push({ key:++seq, text:b.description + (b.category ? "  " + b.category : ""), code:"", desc:b.description || "", size:"", qty:num(bits[1]) || 1, received:0, price:"",
+      stock:"b:" + b.code, how:"picked", score:1 });
+  });
+  if(sup){ draft.supplier = sup.name || ""; draft.supplierEmail = sup.email || ""; draft.supplierCc = extraCc(sup.ccEmail || sup.cc || ""); }
+  toast("New order with " + draft.lines.length + " item" + (draft.lines.length === 1 ? "" : "s") + " from the reorder list — check the quantities.", "ok");
+  render();
+}
 function editOrder(o){
   draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", supplierCc:o.supplierCc||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
     location:o.location || locationsAll()[0], notes:o.notes||"", dueDate:o.dueDate||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
-    lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), price:l.price == null ? "" : l.price, stock:l.stock||"", nf:l.nf||null, per:l.per||"", how:"picked", score:1 }; }) }
+    lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), price:l.price == null ? "" : l.price, stock:l.stock||"", nf:l.nf||null, per:l.per||"", priceBy:l.priceBy||"", m3:l.m3Set ? l.m3 : "", how:"picked", score:1 }; }) }
     : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:ui.loc || locationsAll()[0], notes:"", file:null, lines:[] };
   ui.view = "edit"; render(); window.scrollTo(0, 0);
 }
@@ -2251,11 +2306,18 @@ function bind(){
     if(q("#addBlank")) q("#addBlank").onclick = function(){ readDraftFields(); draft.lines.push({ key:++seq, text:"", code:"", desc:"", size:"", qty:0, received:0, stock:"", how:"picked", score:1 }); render(); };
     qa("[data-stock]").forEach(function(s){ s.onchange = function(){ readDraftFields(); var l = draftLine(s.getAttribute("data-stock")); l.stock = s.value; l.how = "picked"; l.score = 1;
       if(l.stock === "new:board" && !l.nf) l.nf = { description:l.desc || l.text || "", category:l.size || "" };
+      if(l.stock === "new:solid" && (!l.nf || l.nf.species === undefined)){ var dm = String(l.size || l.desc || l.text || "").match(/(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)/);
+        l.nf = { species:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), thickness:dm ? dm[1] : "", width:dm ? dm[2] : "", length:"", unit:"pcs" }; }
       if(l.stock === "new:cons" && !l.nf) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), unit:"each" };
       if(l.stock === "new:tool" && (!l.nf || l.nf.unit)) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), category:"" };
       l.per = guessPer(l);
       render(); }; });
     qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; readDraftFields(); render(); }; });
+    qa("[data-priceby]").forEach(function(sel){ sel.onchange = function(){ var l = draftLine(sel.getAttribute("data-priceby")); l.priceBy = sel.value; if(!l.priceBy) l.m3 = ""; readDraftFields(); render(); }; });
+    qa("[data-m3]").forEach(function(inp){ inp.oninput = function(){ var l = draftLine(inp.getAttribute("data-m3")); l.m3 = inp.value === "" ? "" : num(inp.value);
+      var a = document.querySelector('[data-amt="' + l.key + '"]'); if(a) a.textContent = num(l.price) ? "= " + money(lineAmt(l)) : "";
+      var tt = orderTotals(draft.lines.filter(function(x){ return num(x.qty) > 0; })), t = q("#draftTot");
+      if(t && tt.ex) t.innerHTML = 'Total excl. VAT <b>' + money(tt.ex) + '</b> · VAT ' + money(tt.vat) + ' · <b>incl. VAT ' + money(tt.inc) + '</b>'; }; inp.onchange = function(){ readDraftFields(); render(); }; });
     qa("[data-qty]").forEach(function(inp){ inp.oninput = function(){ draftLine(inp.getAttribute("data-qty")).qty = num(inp.value); }; inp.onchange = function(){ readDraftFields(); render(); }; });
     qa("[data-price]").forEach(function(inp){ inp.oninput = function(){ var l = draftLine(inp.getAttribute("data-price")); l.price = inp.value === "" ? "" : num(inp.value);
       var a = document.querySelector('[data-amt="' + l.key + '"]'); if(a) a.textContent = num(l.price) ? "= " + money(lineAmt(l)) : "";
@@ -2302,7 +2364,7 @@ function start(){
   if(started) return; started = true;
   db = firebase.database();
   var rr = function(){ if(!busy) render(); };
-  db.ref("boardStock").on("value", function(s){ D.board = s.val() || { boards:[], locations:["Main"] }; rr(); });
+  db.ref("boardStock").on("value", function(s){ D.board = s.val() || { boards:[], locations:["Main"] }; if(pendingReorder) startReorder(); rr(); });
   ["screwItems","consumableTypes","suppliers","meta"].forEach(function(k){
     db.ref("consumablesStock/" + k).on("value", function(s){ D.cons[{ screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]] = s.val() || {}; rr(); });
   });
@@ -2314,6 +2376,7 @@ function start(){
     if(ui.view === "list" || ui.view === "order") rr(); });
   var h = (location.hash || "").slice(1);
   if(h.indexOf("order=") === 0){ ui.view = "order"; ui.orderId = decodeURIComponent(h.slice(6)); }
+  if(h.indexOf("reorder=") === 0){ pendingReorder = decodeURIComponent(h.slice(8)); history.replaceState(null, "", location.pathname); if(D.board) startReorder(); }
   render();
 }
 try{
