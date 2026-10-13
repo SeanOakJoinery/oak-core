@@ -945,24 +945,27 @@ async function commitBoard(lines, loc, who, reason, summary){
     var locs = (cur.locations && cur.locations.length) ? cur.locations : ["Main"];
     var ts = new Date().toISOString();
     lines.forEach(function(l){
-      var q = Math.round(Number(l.qty)||0), b;
+      var q, b;
       if(l.match === "__new"){
         var n = l.nf; b = cur.boards.find(function(x){ return sameBoard(x, n); });
         if(!b){ b = { code:newBoardCode(cur.boards, n.description), description:n.description, category:n.category||"", unit:n.unit||"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId: st.supplier || "" }; cur.boards.push(b); }
         l.newId = b.code;
       } else b = cur.boards.find(function(x){ return x.code === l.match; });
       if(!b) throw new Error("One of these boards was deleted in Board Stock — refresh and pick again.");
+      // solid wood counted in m³ / linear metres keeps decimals (2026-10-13)
+      q = (b.kind === "solid" && (b.unit === "m³" || b.unit === "lm")) ? Math.round((Number(l.qty)||0) * 1000) / 1000 : Math.round(Number(l.qty)||0);
+      l.q = q;
       if(typeof b.qty === "number"){ var o = {}; o[locs[0]] = b.qty; b.qty = o; }
       if(!b.qty || typeof b.qty !== "object") b.qty = {};
-      b.qty[loc] = (Number(b.qty[loc])||0) + q;
-      var total = Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0);
+      b.qty[loc] = Math.round(((Number(b.qty[loc])||0) + q) * 1000) / 1000;
+      var total = Math.round(Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0) * 1000) / 1000;
       b.reorderNotified = total <= (Number(b.reorderLevel)||0);
       cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason });
     });
     return cur;
   });
   if(!res.committed) throw new Error("Board Stock didn't load — check your connection and try again.");
-  lines.forEach(function(l){ summary.push({ item:lineLabel(l), itemId:l.newId||l.match, qty:Math.round(Number(l.qty)||0), unit:"EA", text:String(l.src.text||"").slice(0,160), isNew:l.match==="__new" }); });
+  lines.forEach(function(l){ summary.push({ item:lineLabel(l), itemId:l.newId||l.match, qty:(l.q != null ? l.q : Math.round(Number(l.qty)||0)), unit:"EA", text:String(l.src.text||"").slice(0,160), isNew:l.match==="__new" }); });
 }
 async function commitCons(lines, loc, summary){
   var base = "consumablesStock/";
