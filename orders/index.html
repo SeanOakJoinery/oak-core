@@ -985,6 +985,14 @@ var AI_PROMPT = 'You read supplier quotations, tax invoices and delivery notes (
   'Timber is often written as a heading such as "S A Pine 152 x 38mm @ R7300" followed by lines like "125  3.6 x 152 x 38" and a volume such as 2.606: ' +
   'then give one line per quantity row with description "S A Pine 152x38", size "3.6m x 152 x 38", quantity = number of pieces (125), unit "pcs", unit_price = the price per m³ (7300), price_per "m3", volume_m3 = the m³ figure written (2.606) and amount = the line total. ' +
   'Services such as machining, planing, cutting or delivery are their own lines (put any size they mention in "size"). If something cannot be read, leave it empty rather than guessing.';
+var AI_SCHEMA = { type:"OBJECT", properties:{
+  supplier:{ type:"STRING" }, document_type:{ type:"STRING" }, document_number:{ type:"STRING" }, date:{ type:"STRING" },
+  lines:{ type:"ARRAY", items:{ type:"OBJECT", properties:{ code:{ type:"STRING" }, description:{ type:"STRING" }, size:{ type:"STRING" }, quantity:{ type:"NUMBER" }, unit:{ type:"STRING" },
+    unit_price:{ type:"NUMBER" }, price_per:{ type:"STRING" }, volume_m3:{ type:"NUMBER" }, amount:{ type:"NUMBER" } }, required:["description", "quantity"] } },
+  subtotal:{ type:"NUMBER" }, vat:{ type:"NUMBER" }, total:{ type:"NUMBER" } }, required:["supplier", "lines"] };
+// numbers as the AI may write them: "19 023,80", "R19,023.80", "125 pcs"
+function aiNum(v){ if(typeof v === "number") return v; var t = String(v == null ? "" : v).replace(/[^\d.,-]/g, "");
+  if(/,\d{1,2}$/.test(t) && t.indexOf(".") < 0) t = t.replace(/\./g, "").replace(",", "."); else t = t.replace(/,/g, ""); var n = parseFloat(t); return isFinite(n) ? n : 0; }
 async function fileToImages(file){
   var lower = (file.name || "").toLowerCase(), out = [];
   var toJpeg = function(c){ var max = 2200, sc = Math.min(1, max / Math.max(c.width, c.height)); var d = document.createElement("canvas"); d.width = Math.round(c.width * sc); d.height = Math.round(c.height * sc);
@@ -1004,7 +1012,7 @@ async function aiRead(file){
   setStatus("Reading with AI…", 0.5);
   var imgs = await fileToImages(file);
   var body = { contents:[{ parts:[{ text:AI_PROMPT }].concat(imgs.map(function(b){ return { inline_data:{ mime_type:"image/jpeg", data:b } }; })) }],
-    generationConfig:{ temperature:0, response_mime_type:"application/json" } };
+    generationConfig:{ temperature:0, response_mime_type:"application/json", response_schema:AI_SCHEMA } };
   var models = [aiCfg().model].concat(AI_MODELS).filter(function(m, i, a){ return m && a.indexOf(m) === i; }), res = null, err = "";
   for(var i = 0; i < models.length; i++){
     var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(models[i]) + ":generateContent", { method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key":key }, body:JSON.stringify(body) });
@@ -1016,15 +1024,24 @@ async function aiRead(file){
   if(!res) throw new Error(err || "no answer");
   var txt = ((((res.candidates || [])[0] || {}).content || {}).parts || []).map(function(p){ return p.text || ""; }).join("");
   var info; try{ info = JSON.parse(txt.replace(/^```(json)?|```$/g, "").trim()); }catch(e){ throw new Error("the AI answer wasn't readable"); }
-  aiInfo = info;
+  aiInfo = info; window.__aiInfo = info; window.__aiText = txt;
+  // tolerate other shapes of answer: {items:[…]}, {line_items:[…]}, a bare list, qty/price/total keys
+  var rawLines = Array.isArray(info) ? info : (info.lines || info.items || info.line_items || []);
+  if(Array.isArray(info)) info = aiInfo = { lines:rawLines };
   // let the normal supplier / document number detection see what the AI read
   docText = [info.supplier ? info.supplier + " (Pty) Ltd" : "", info.document_number ? (/deliver/i.test(info.document_type || "") ? "Delivery note no: " : /invoice/i.test(info.document_type || "") ? "Invoice no: " : "Quote no: ") + info.document_number : ""].filter(Boolean).join("\n") + "\n" + docText;
-  return (info.lines || []).filter(function(l){ return l && (l.description || l.code) && (num(l.quantity) > 0 || num(l.amount) > 0); }).map(function(l){
-    var m3 = /m3|m³|cub/i.test(l.price_per || "") || num(l.volume_m3) > 0;
-    var qty = num(l.quantity) || 1, price = num(l.unit_price) || (num(l.amount) && !m3 ? Math.round(num(l.amount) / qty * 10000) / 10000 : 0);
-    if(!m3 && num(l.amount) && price && Math.abs(price * qty - num(l.amount)) > 0.02) price = Math.round(num(l.amount) / qty * 10000) / 10000;   // trust the line total
+  var out = rawLines.map(function(l){ if(!l || typeof l !== "object") return null;
+    return { code:l.code || l.item_code || "", description:l.description || l.desc || l.item || l.name || "", size:l.size || l.dimensions || "", quantity:aiNum(l.quantity != null ? l.quantity : (l.qty != null ? l.qty : l.pieces)),
+      unit:l.unit || "", unit_price:aiNum(l.unit_price != null ? l.unit_price : (l.price != null ? l.price : l.rate)), price_per:l.price_per || l.per || "", volume_m3:aiNum(l.volume_m3 != null ? l.volume_m3 : l.m3),
+      amount:aiNum(l.amount != null ? l.amount : (l.total != null ? l.total : l.line_total)) }; })
+    .filter(function(l){ return l && (l.description || l.code) && (l.quantity > 0 || l.amount > 0); });
+  if(!out.length) throw new Error("the AI read the document but found no item lines" + (rawLines.length ? " it could use" : ""));
+  return out.map(function(l){
+    var m3 = /m3|m³|cub/i.test(l.price_per || "") || l.volume_m3 > 0;
+    var qty = l.quantity || 1, price = l.unit_price || (l.amount && !m3 ? Math.round(l.amount / qty * 10000) / 10000 : 0);
+    if(!m3 && l.amount && price && Math.abs(price * qty - l.amount) > 0.02) price = Math.round(l.amount / qty * 10000) / 10000;   // trust the line total
     return { code:String(l.code || ""), desc:String(l.description || "").trim(), size:String(l.size || "").trim(), job:"", material:"", notes:"", qty:qty, qtyL:null,
-      price:price || "", amount:num(l.amount) || "", priceBy:m3 ? "m3" : "", m3:m3 && num(l.volume_m3) ? num(l.volume_m3) : "", ai:true,
+      price:price || "", amount:l.amount || "", priceBy:m3 ? "m3" : "", m3:m3 && l.volume_m3 ? l.volume_m3 : "", ai:true,
       text:[l.code, l.description, l.size, qty + " " + (l.unit || ""), price ? "@ R" + price + (m3 ? "/m³" : "") : "", l.amount ? "= R" + l.amount : ""].filter(Boolean).join("  ") };
   });
 }
@@ -1075,15 +1092,17 @@ async function readDoc(file){
   throw new Error("That file type isn't supported. Use a PDF, photo, Excel or CSV file.");
 }
 async function readInto(file, fn, forceAi){
-  busy = true; render();
+  busy = true; render(); var aiErr = "";
   try{
     var raw = forceAi ? [] : await readDoc(file);
     // scanned / photographed / handwritten documents: let the AI reader have a go (2026-10-16)
     if(aiKey() && (forceAi || docOcr || !(raw || []).length)){
       try{ var ai = await aiRead(file); if(ai.length){ raw = ai; toast("Read with AI — check every line against the document.", "ok"); } }
-      catch(e){ console.warn("AI read", e); toast("AI reading didn't work: " + (e.message || e) + (forceAi ? "" : " — showing what the normal reader found."), "err"); }
+      catch(e){ console.warn("AI read", e, window.__aiText); aiErr = "AI reading didn't work: " + (e.message || e) + (forceAi ? "" : " — showing what the normal reader found."); toast(aiErr, "err"); }
     }
-    window.__rawLines = raw; setStatus("", 1); fn(raw || [], file);
+    window.__rawLines = raw; setStatus(aiErr, 1);
+    if(aiErr && !(raw || []).length){ busy = false; render(); return; }   // keep the AI message on screen
+    fn(raw || [], file);
   }
   catch(e){ console.warn(e); toast("Couldn't read that file: " + (e.message || e), "err"); setStatus(""); }
   busy = false; render();
