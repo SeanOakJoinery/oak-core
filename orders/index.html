@@ -972,9 +972,65 @@ function imageToCanvas(file){
 }
 // Returns the lines found in a PDF / photo / Excel file (same reader as Stock In).
 var docText = "";
+var docOcr = false, aiInfo = null;
+// ---------- AI reading (Google Gemini, free tier) — for handwritten and badly scanned documents ----------
+// The key is saved by Sean under Orders → 🤖 AI reading (orders/settings/ai). The scan is sent to Google
+// with a request for the lines as JSON; nothing else is sent.
+var AI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+function aiCfg(){ return (D.settings && D.settings.ai) || {}; }
+function aiKey(){ return String(aiCfg().key || "").trim(); }
+var AI_PROMPT = 'You read supplier quotations, tax invoices and delivery notes (often handwritten) for Oak Joinery, a South African joinery. ' +
+  'Return ONLY JSON: {"supplier":"","document_type":"quote|invoice|delivery note","document_number":"","date":"YYYY-MM-DD","lines":[{"code":"","description":"","size":"","quantity":0,"unit":"","unit_price":0,"price_per":"","volume_m3":0,"amount":0}],"subtotal":0,"vat":0,"total":0}. ' +
+  'Rules: one entry per item line; amounts in rands excluding VAT; numbers as plain numbers. Oak Joinery is the customer, never the supplier. ' +
+  'Timber is often written as a heading such as "S A Pine 152 x 38mm @ R7300" followed by lines like "125  3.6 x 152 x 38" and a volume such as 2.606: ' +
+  'then give one line per quantity row with description "S A Pine 152x38", size "3.6m x 152 x 38", quantity = number of pieces (125), unit "pcs", unit_price = the price per m³ (7300), price_per "m3", volume_m3 = the m³ figure written (2.606) and amount = the line total. ' +
+  'Services such as machining, planing, cutting or delivery are their own lines (put any size they mention in "size"). If something cannot be read, leave it empty rather than guessing.';
+async function fileToImages(file){
+  var lower = (file.name || "").toLowerCase(), out = [];
+  var toJpeg = function(c){ var max = 2200, sc = Math.min(1, max / Math.max(c.width, c.height)); var d = document.createElement("canvas"); d.width = Math.round(c.width * sc); d.height = Math.round(c.height * sc);
+    d.getContext("2d").drawImage(c, 0, 0, d.width, d.height); return d.toDataURL("image/jpeg", 0.85).split(",")[1]; };
+  if(/\.pdf$/.test(lower) || file.type === "application/pdf"){
+    var pdfjs = await pdfLib(), pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    for(var p = 1; p <= Math.min(pdf.numPages, 3); p++){
+      var pg = await pdf.getPage(p), vp = pg.getViewport({ scale: 2 }), c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+      await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise; out.push(toJpeg(c));
+    }
+  } else if(/^image\//.test(file.type) || /\.(jpe?g|png|webp|heic)$/.test(lower)) out.push(toJpeg(await imageToCanvas(file)));
+  else throw new Error("AI reading works on PDFs and photos");
+  return out;
+}
+async function aiRead(file){
+  var key = aiKey(); if(!key) throw new Error("no AI key saved");
+  setStatus("Reading with AI…", 0.5);
+  var imgs = await fileToImages(file);
+  var body = { contents:[{ parts:[{ text:AI_PROMPT }].concat(imgs.map(function(b){ return { inline_data:{ mime_type:"image/jpeg", data:b } }; })) }],
+    generationConfig:{ temperature:0, response_mime_type:"application/json" } };
+  var models = [aiCfg().model].concat(AI_MODELS).filter(function(m, i, a){ return m && a.indexOf(m) === i; }), res = null, err = "";
+  for(var i = 0; i < models.length; i++){
+    var r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(models[i]) + ":generateContent", { method:"POST", headers:{ "Content-Type":"application/json", "x-goog-api-key":key }, body:JSON.stringify(body) });
+    var j = await r.json().catch(function(){ return {}; });
+    if(r.ok){ res = j; break; }
+    err = (j.error && j.error.message) || ("error " + r.status);
+    if(r.status !== 404) break;                       // only try the next model if this one doesn't exist
+  }
+  if(!res) throw new Error(err || "no answer");
+  var txt = ((((res.candidates || [])[0] || {}).content || {}).parts || []).map(function(p){ return p.text || ""; }).join("");
+  var info; try{ info = JSON.parse(txt.replace(/^```(json)?|```$/g, "").trim()); }catch(e){ throw new Error("the AI answer wasn't readable"); }
+  aiInfo = info;
+  // let the normal supplier / document number detection see what the AI read
+  docText = [info.supplier ? info.supplier + " (Pty) Ltd" : "", info.document_number ? (/deliver/i.test(info.document_type || "") ? "Delivery note no: " : /invoice/i.test(info.document_type || "") ? "Invoice no: " : "Quote no: ") + info.document_number : ""].filter(Boolean).join("\n") + "\n" + docText;
+  return (info.lines || []).filter(function(l){ return l && (l.description || l.code) && (num(l.quantity) > 0 || num(l.amount) > 0); }).map(function(l){
+    var m3 = /m3|m³|cub/i.test(l.price_per || "") || num(l.volume_m3) > 0;
+    var qty = num(l.quantity) || 1, price = num(l.unit_price) || (num(l.amount) && !m3 ? Math.round(num(l.amount) / qty * 10000) / 10000 : 0);
+    if(!m3 && num(l.amount) && price && Math.abs(price * qty - num(l.amount)) > 0.02) price = Math.round(num(l.amount) / qty * 10000) / 10000;   // trust the line total
+    return { code:String(l.code || ""), desc:String(l.description || "").trim(), size:String(l.size || "").trim(), job:"", material:"", notes:"", qty:qty, qtyL:null,
+      price:price || "", amount:num(l.amount) || "", priceBy:m3 ? "m3" : "", m3:m3 && num(l.volume_m3) ? num(l.volume_m3) : "", ai:true,
+      text:[l.code, l.description, l.size, qty + " " + (l.unit || ""), price ? "@ R" + price + (m3 ? "/m³" : "") : "", l.amount ? "= R" + l.amount : ""].filter(Boolean).join("  ") };
+  });
+}
 async function readDoc(file){
   var name = file.name || "file", lower = name.toLowerCase();
-  docText = "";
+  docText = ""; docOcr = false; aiInfo = null;
   if(/\.(xlsx|xls|xlsm|csv)$/.test(lower)){
     setStatus("Reading " + name + "…", 0.3);
     var wb = XLSX.read(await file.arrayBuffer(), { type:"array" }), raw = [];
@@ -991,13 +1047,16 @@ async function readDoc(file){
     var pdfjs = await pdfLib();
     var pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
     var text = "", table = [];
+    // a scan saved as PDF (scanner software adds its own rough text layer) is treated like a photo
+    try{ var meta = await pdf.getMetadata(), inf = (meta && meta.info) || {};
+      if(/scan|canon|epson|brother|ricoh|kyocera|xerox|konica|sharp|lexmark|camscanner|adobe scan|genius scan|\bhp\b/i.test([inf.Creator, inf.Producer].join(" "))) docOcr = true; }catch(e){}
     for(var p = 1; p <= Math.min(pdf.numPages, 10); p++){
       var page = await pdf.getPage(p), tc = await page.getTextContent();
       text += L.pdfItemsToText(tc.items) + "\n";
       table = table.concat(L.pdfTable(tc.items));
     }
     if(text.replace(/\s/g, "").length < 40){
-      text = "";
+      text = ""; docOcr = true;
       for(var q = 1; q <= Math.min(pdf.numPages, 5); q++){
         var pg = await pdf.getPage(q), vp = pg.getViewport({ scale: 2.2 });
         var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
@@ -1009,14 +1068,23 @@ async function readDoc(file){
     return table.length ? table : L.linesFromDoc(text);
   }
   if(/^image\//.test(file.type) || /\.(jpe?g|png|heic|webp)$/.test(lower)){
+    docOcr = true;
     docText = await ocr(await imageToCanvas(file), "photo"); window.__lastDocText = docText;
     return L.linesFromDoc(docText);
   }
   throw new Error("That file type isn't supported. Use a PDF, photo, Excel or CSV file.");
 }
-async function readInto(file, fn){
+async function readInto(file, fn, forceAi){
   busy = true; render();
-  try{ var raw = await readDoc(file); window.__rawLines = raw; setStatus("", 1); fn(raw || [], file); }
+  try{
+    var raw = forceAi ? [] : await readDoc(file);
+    // scanned / photographed / handwritten documents: let the AI reader have a go (2026-10-16)
+    if(aiKey() && (forceAi || docOcr || !(raw || []).length)){
+      try{ var ai = await aiRead(file); if(ai.length){ raw = ai; toast("Read with AI — check every line against the document.", "ok"); } }
+      catch(e){ console.warn("AI read", e); toast("AI reading didn't work: " + (e.message || e) + (forceAi ? "" : " — showing what the normal reader found."), "err"); }
+    }
+    window.__rawLines = raw; setStatus("", 1); fn(raw || [], file);
+  }
   catch(e){ console.warn(e); toast("Couldn't read that file: " + (e.message || e), "err"); setStatus(""); }
   busy = false; render();
 }
@@ -1084,7 +1152,7 @@ function applyDraftDoc(){
   if(!draft.supplier.trim()){
     var s = detectSupplier(docText, allSuppliers());
     if(s){ draft.supplier = s.name; if(!draft.supplierEmail && s.email) draft.supplierEmail = s.email; said.push("supplier " + s.name); }
-    else { var g = guessSupplierName(docText); if(g){ draft.supplier = g; said.push("supplier " + g + " (new — check the name)"); } }
+    else { var g = (aiInfo && aiInfo.supplier) || guessSupplierName(docText); if(g){ draft.supplier = g; said.push("supplier " + g + " (new — check the name)"); } }
   }
   if(!draft.supplierEmail){ var e = guessEmail(docText); if(e){ draft.supplierEmail = e; } }
   if(!draft.ref){ var r = detectRef(docText, "quote") || detectRef(docText, "delivery"); if(r){ draft.ref = r; said.push("no. " + r); } }
@@ -1097,7 +1165,7 @@ function addDraftLines(raw, source){
   raw.forEach(function(l){
     var m = matchStock(l, L.norm(l.code) && cc[L.norm(l.code)] === 1);
     draft.lines.push({ key:++seq, text:l.text || [l.code,l.desc,l.size].filter(Boolean).join("  "), code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:0, price:l.price || "",
-      stock:m.score >= 0.5 ? m.id : "", how:m.how, score:m.score });
+      stock:m.score >= 0.5 ? m.id : "", how:m.how, score:m.score, fromFile:true, priceBy:l.priceBy || "", m3:l.m3 || "" });
     var nl = draft.lines[draft.lines.length - 1]; nl.per = guessPer(nl);
   });
   var got = draft.lines.filter(function(x){ return x.stock; }).length;
@@ -1150,7 +1218,7 @@ function viewList(){
       var n = every.filter(function(o){ return isOpen(o) && (l ? o.location === l : true); }).length, late = every.filter(function(o){ return isLate(o) && (l ? o.location === l : true); }).length;
       return '<button type="button" data-loc="' + esc(l) + '" class="' + (ui.loc===l?"on":"") + '">' + (l ? esc(l) : "All locations") + '<div class="small" style="font-weight:400;opacity:.8">' + n + ' open' + (late ? ' · <span style="color:#E39A80">' + late + ' late</span>' : '') + '</div></button>'; }).join("") +
       (user.isRoot ? '<button type="button" id="addLoc" style="font-weight:500;color:var(--muted)">＋ Add location</button>' : '') + '</div>';
-  h += '<div class="row" style="margin-bottom:14px">' + (canQuote() ? '<button class="btn btn-primary" id="newOrder">＋ New order / quote</button>' : '') + (canBoard(user) || canCons(user) ? '<button class="btn" id="rcvAny">📦 Receive a delivery</button>' : '') + (core.userHasApp(user, "suppliers") ? '<a class="btn" href="../suppliers/">🚚 Suppliers</a>' : '') + (user.isRoot ? '<button class="btn" id="poBookBtn">PO numbers' + (poBook() && poBook().to ? ' (' + poLeft() + ' left)' : '') + '</button>' : '') + '</div>';
+  h += '<div class="row" style="margin-bottom:14px">' + (canQuote() ? '<button class="btn btn-primary" id="newOrder">＋ New order / quote</button>' : '') + (canBoard(user) || canCons(user) ? '<button class="btn" id="rcvAny">📦 Receive a delivery</button>' : '') + (core.userHasApp(user, "suppliers") ? '<a class="btn" href="../suppliers/">🚚 Suppliers</a>' : '') + (user.isRoot ? '<button class="btn" id="poBookBtn">PO numbers' + (poBook() && poBook().to ? ' (' + poLeft() + ' left)' : '') + '</button>' : '') + (isMain() ? '<button class="btn" id="aiBtn">🤖 AI reading' + (aiKey() ? ' ✓' : '') + '</button>' : '') + '</div>';
   h += poBanner();
   // Everyone can see who may approve orders and add quotes (set in Dispatch → Manage users).
   var team = core.getUsers().filter(function(u){ return u && u.username; });
@@ -1269,7 +1337,7 @@ function viewEdit(){
        '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
        '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
        '<div class="status" id="status">' + esc(statusMsg) + '</div><div class="bar' + (busy?"":" hide") + '"><i id="barI" style="width:' + Math.round(progress*100) + '%"></i></div>' +
-       (d.file || d.quoteUrl ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(d.file ? d.file.name : (d.quoteFile || "quotation")) + '</div>' : '') +
+       (d.file || d.quoteUrl ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(d.file ? d.file.name : (d.quoteFile || "quotation")) + (d.file && aiKey() ? ' <button class="btn btn-sm" type="button" id="aiAgain" style="margin-left:8px">✨ Read again with AI</button>' : '') + '</div>' : '') +
        '<details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">Paste lines instead</summary><textarea id="pasteIn" placeholder="Paste rows from the quote or Excel"></textarea><button class="btn btn-sm" type="button" id="pasteGo" style="margin-top:8px">Read pasted lines</button></details>' +
        '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line by hand</button></div></div>';
   h += '<div class="card"><h2><span class="step">3</span>Check the lines</h2>';
@@ -1283,7 +1351,7 @@ function viewEdit(){
           packSizeOf(l) ? '<select data-per="' + l.key + '" style="padding:4px 6px;font-size:12px;margin-top:4px"><option value="pack"' + (l.per!=="each"?" selected":"") + '>packs (' + packSizeOf(l) + ')</option><option value="each"' + (l.per==="each"?" selected":"") + '>each</option></select>' : '<div class="unit">' + esc(unitOf(l)) + '</div>') + (num(l.received) ? '<div class="unit">' + l.received + ' in</div>' : '') + '</div>' +
         '<button class="x" type="button" title="Remove line" data-del="' + l.key + '">×</button></div>' +
         '<div class="prow"><label>' + (l.priceBy === "m3" ? "Price per m³ excl. VAT" : "Unit price excl. VAT") + '</label><span class="rprefix">R</span><input type="number" inputmode="decimal" min="0" step="0.01" data-price="' + l.key + '" value="' + (l.price === "" || l.price == null ? "" : esc(l.price)) + '" placeholder="0.00"><span class="amt" data-amt="' + l.key + '">' + (num(l.price) ? "= " + money(lineAmt(l)) : "") + '</span></div>' +
-        (solidPcsInfo(l) ? '<div class="prow"><label>Priced</label><select data-priceby="' + l.key + '" style="width:auto"><option value="">per piece</option><option value="m3"' + (l.priceBy === "m3" ? " selected" : "") + '>per m³</option></select>' +
+        (solidPcsInfo(l) || l.priceBy === "m3" ? '<div class="prow"><label>Priced</label><select data-priceby="' + l.key + '" style="width:auto"><option value="">per piece</option><option value="m3"' + (l.priceBy === "m3" ? " selected" : "") + '>per m³</option></select>' +
           (l.priceBy === "m3" ? '<input type="number" inputmode="decimal" min="0" step="any" data-m3="' + l.key + '" value="' + (l.m3 === "" || l.m3 == null ? "" : esc(l.m3)) + '" placeholder="' + (m3Each(l) ? (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) : "m³") + '" style="width:110px"><span class="small muted">m³ ' + (m3Each(l) ? '(blank = worked out from the size: ' + (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) + ')' : '— type the m³ from the quote') + '</span>' : '') + '</div>' : '') +
         newFieldsHtml(l) + '</div>';
     });
@@ -1375,7 +1443,7 @@ function addRcvLines(raw, source){
       if(c){ match = c.id; how = "stock"; score = s.score; }
     }
     if(match){ got++; used[match] = 1; }
-    rcv.lines.push({ key:++seq, src:l, qty:num(l.qty), match:match, how:how, score:score });
+    rcv.lines.push({ key:++seq, src:l, qty:num(l.qty), match:match, how:how, score:score, fromFile:true });
   });
   toast("Read " + raw.length + " line" + (raw.length===1?"":"s") + " — " + got + " matched to the order. Check them below.", "ok");
 }
@@ -1479,7 +1547,7 @@ function viewReceive(){
        '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn btn-sm" type="button" id="pick">Choose file</button><button class="btn btn-sm" type="button" id="snap">📷 Take photo</button></div></div>' +
        '<input type="file" id="fileIn" class="hide" accept=".pdf,.xlsx,.xls,.xlsm,.csv,image/*"><input type="file" id="camIn" class="hide" accept="image/*" capture="environment">' +
        '<div class="status" id="status">' + esc(statusMsg) + '</div><div class="bar' + (busy?"":" hide") + '"><i id="barI" style="width:' + Math.round(progress*100) + '%"></i></div>' +
-       (r.file ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(r.file.name) + '</div>' : '') +
+       (r.file ? '<div class="small muted" style="margin-top:6px">📎 ' + esc(r.file.name) + (aiKey() ? ' <button class="btn btn-sm" type="button" id="aiAgain" style="margin-left:8px">✨ Read again with AI</button>' : '') + '</div>' : '') +
        (r.supplier ? '<div class="row" style="margin-top:10px"><button class="btn btn-sm" type="button" id="allCame">✓ Everything outstanding arrived</button><button class="btn btn-sm" type="button" id="addBlank">＋ Add a line</button></div>' : '') + '</div>';
   }
   if(r.supplier){
@@ -1545,8 +1613,8 @@ async function saveDraft(){
     o.lines = {};
     lines.forEach(function(l, n){
       var lid = l.lid || uid() + n, st = stockById(l.stock);
-      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 100) / 100 : null,
-        priceBy: l.priceBy === "m3" && solidPcsInfo(l) ? "m3" : "", m3: l.priceBy === "m3" && solidPcsInfo(l) ? lineM3(l) : null, m3Set: l.priceBy === "m3" && l.m3 !== "" && l.m3 != null };
+      o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 10000) / 10000 : null,
+        priceBy: l.priceBy === "m3" && (solidPcsInfo(l) || (l.m3 !== "" && l.m3 != null)) ? "m3" : "", m3: l.priceBy === "m3" && (solidPcsInfo(l) || (l.m3 !== "" && l.m3 != null)) ? lineM3(l) : null, m3Set: l.priceBy === "m3" && l.m3 !== "" && l.m3 != null };
       if(l.nf && l.stock && l.stock.indexOf("new:") === 0) o.lines[lid].nf = l.nf;
     });
     if(o.status === "part" && orderOut(o) === 0) o.status = "received";
@@ -1956,6 +2024,26 @@ async function whatsappPo(o){
     lines.slice(0, 30).join("\n") + (lines.length > 30 ? "\n… and " + (lines.length - 30) + " more" : "") + (o.poUrl ? "\n\nPO (PDF): " + o.poUrl : "") + "\n\nPlease quote PO " + o.po + " on your delivery note and invoice.";
   window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
 }
+function openAiSettings(){
+  if(!isMain()) return;
+  var c = aiCfg();
+  openModal('<h2>🤖 AI reading</h2><p class="small" style="margin-top:0">Reads handwritten and badly scanned quotes, invoices and delivery notes with Google\'s free Gemini AI. Printed PDFs are still read the normal way.</p>' +
+    '<ol class="small" style="margin:0 0 10px 18px;line-height:1.6"><li>Open <b>aistudio.google.com</b> and sign in with a Google account.</li><li>Tap <b>Get API key → Create API key</b> and copy it.</li><li>Paste it below and tap Save.</li></ol>' +
+    '<label>Gemini API key</label><input id="aiKeyIn" type="password" autocomplete="off" placeholder="' + (c.key ? "saved — paste a new one to replace it" : "AIza…") + '">' +
+    '<label>Model</label><input id="aiModelIn" value="' + esc(c.model || AI_MODELS[0]) + '">' +
+    '<p class="small muted">On the free tier Google may use what is sent to improve its AI. Only the document picture is sent.</p>' +
+    '<div class="row" style="justify-content:space-between;margin-top:14px">' + (c.key ? '<button class="btn" id="aiOff" style="color:#E39A80">Remove key</button>' : '<span></span>') +
+    '<div class="row"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div></div>');
+  document.getElementById("mCancel").onclick = closeModal;
+  if(document.getElementById("aiOff")) document.getElementById("aiOff").onclick = async function(){ if(!confirm("Remove the AI key? Handwritten documents won't be read any more.")) return; await db.ref("orders/settings/ai").remove(); D.settings = Object.assign({}, D.settings, { ai:null }); closeModal(); toast("AI key removed.", "ok"); render(); };
+  document.getElementById("mOk").onclick = async function(){
+    var k = document.getElementById("aiKeyIn").value.trim(), m = document.getElementById("aiModelIn").value.trim() || AI_MODELS[0];
+    if(!k && !c.key){ toast("Paste the API key first.", "err"); return; }
+    var rec = { key:k || c.key, model:m, by:user.username, at:new Date().toISOString() };
+    try{ await db.ref("orders/settings/ai").set(rec); D.settings = Object.assign({}, D.settings, { ai:rec }); closeModal(); toast("AI reading is on — upload a handwritten document to try it.", "ok"); render(); }
+    catch(e){ toast("Couldn't save: " + (e.message || e), "err"); }
+  };
+}
 function openModal(html){ var m = document.getElementById("modal"); m.innerHTML = '<div class="mbg"><div class="mbox">' + html + '</div></div>'; m.classList.remove("hide"); }
 function closeModal(){ var m = document.getElementById("modal"); m.innerHTML = ""; m.classList.add("hide"); }
 function openPoBook(){
@@ -2251,6 +2339,7 @@ function bind(){
   if(q("#newOrder")) q("#newOrder").onclick = function(){ if(!canQuote()){ toast("You don't have permission to add quotes — ask Sean.", "err"); return; } editOrder(null); };
   if(q("#rcvAny")) q("#rcvAny").onclick = function(){ startReceive("", null); };
   if(q("#poBookBtn")) q("#poBookBtn").onclick = openPoBook;
+  if(q("#aiBtn")) q("#aiBtn").onclick = openAiSettings;
   if(q("#apprBtn")) q("#apprBtn").onclick = openApprovers;
   qa("[data-poact]").forEach(function(b){ b.onclick = function(e){ e.stopPropagation(); ui.orderId = b.getAttribute("data-po"); ui.poAction = b.getAttribute("data-poact"); ui.view = "po"; ui.poFrom = "list"; render(); window.scrollTo(0, 0); }; });
   if(q("#addLoc")) q("#addLoc").onclick = async function(){ var n = await addLocationFlow(); if(n){ setLoc(n); render(); } };
@@ -2301,6 +2390,8 @@ function bind(){
     if(q("#dSup")) q("#dSup").onchange = function(){ readDraftFields(); var s = allSuppliers().find(function(x){ return x.name.toLowerCase() === draft.supplier.trim().toLowerCase(); }); if(s && s.email && !draft.supplierEmail){ draft.supplierEmail = s.email; } if(s && s.cc && !draft.supplierCc){ draft.supplierCc = s.cc; } render(); };
     qa("[data-supto]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.newSupTo = b.getAttribute("data-supto"); render(); }; });
     qa("[data-st]").forEach(function(b){ b.onclick = function(){ readDraftFields(); draft.status = b.getAttribute("data-st"); render(); }; });
+    if(q("#aiAgain")) q("#aiAgain").onclick = function(){ readDraftFields(); draft.lines = draft.lines.filter(function(l){ return !l.fromFile || num(l.received) > 0; });
+      readInto(draft.file, function(raw){ var said = applyDraftDoc(); addDraftLines(raw, "file"); if(said.length) toast("Read " + said.join(", ") + " from the document.", "ok"); }, true); };
     bindFileInputs(function(f){ readDraftFields(); draft.file = f; readInto(f, function(raw){ var said = applyDraftDoc(); addDraftLines(raw, "file"); if(said.length) setTimeout(function(){ toast("Read " + said.join(" and ") + " from the document.", "ok"); }, 1800); }); });
     if(q("#pasteGo")) q("#pasteGo").onclick = function(){ readDraftFields(); addDraftLines(L.linesFromText(q("#pasteIn").value), "pasted text"); render(); };
     if(q("#addBlank")) q("#addBlank").onclick = function(){ readDraftFields(); draft.lines.push({ key:++seq, text:"", code:"", desc:"", size:"", qty:0, received:0, stock:"", how:"picked", score:1 }); render(); };
@@ -2340,6 +2431,7 @@ function bind(){
       rcv.location = this.value; if(!rcv.orderId){ rcv.lines = []; if(!openLinesFor(rcv.supplier).length) rcv.supplier = ""; } render(); };
     if(q("#rRef")) q("#rRef").oninput = function(){ rcv.docRef = this.value.trim(); };
     if(q("#allOrders")) q("#allOrders").onclick = function(){ rcv.orderId = null; render(); };
+    if(q("#aiAgain")) q("#aiAgain").onclick = function(){ rcv.lines = rcv.lines.filter(function(l){ return !l.fromFile; }); readInto(rcv.file, function(raw){ rcvDoc(raw); }, true); };
     bindFileInputs(function(f){ rcv.file = f; readInto(f, function(raw){ rcvDoc(raw); }); });
     if(q("#allCame")) q("#allCame").onclick = function(){ if(rcv.lines.length && !confirm("Replace the lines below with everything still to come?")) return; fillAllOutstanding(); render(); };
     if(q("#addBlank")) q("#addBlank").onclick = function(){ rcv.lines.push({ key:++seq, src:{ text:"" }, qty:0, match:"", how:"picked", score:1 }); render(); };
@@ -2370,6 +2462,7 @@ function start(){
   });
   db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
   db.ref("suppliers/list").on("value", function(s){ D.sups = s.val() || {}; if(ui.view === "list") rr(); });
+  db.ref("orders/settings").on("value", function(s){ D.settings = s.val() || {}; if(ui.view === "list") rr(); });
   db.ref("orders/poBook").on("value", function(s){ D.poBook = s.val() || null; if(ui.view === "list" || ui.view === "order") rr(); });
   db.ref("orders/list").on("value", function(s){ D.orders = s.val() || {}; D.loaded = true;
     // don't redraw under someone typing in a form
