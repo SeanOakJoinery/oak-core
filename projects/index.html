@@ -370,7 +370,23 @@ function mats(pid){ return list(D.materials[pid]).sort(function(a,b){ return Str
 // the planned span of a job / assembly from its stage dates
 function spanOf(stages){ var s = null, e = null; STAGES.forEach(function(st){ var x = stages && stages[st.k]; if(!x) return;
   [x.start, x.end].forEach(function(v){ if(!v) return; if(!s || v < s) s = v; if(!e || v > e) e = v; }); }); return { s:s, e:e }; }
+// Job programme (2026-10-17): quote → design → fabrication → install → handover, planned per job
+var PLAN = [
+  { k:"quote",    t:"Quote",              one:true },
+  { k:"design",   t:"Design",             c:"#8C8CB8" },
+  { k:"approval", t:"Design approval",    one:true },
+  { k:"fab",      t:"Fabrication start",  one:true },
+  { k:"cutting",  t:"Cutting",            c:"#6FA0C8" },
+  { k:"edging",   t:"Edging",             c:"#5FB3A6" },
+  { k:"mfg",      t:"Manufacturing",      c:"#E0A33A" },
+  { k:"install",  t:"Installation",       c:"#B48CD8" },
+  { k:"handover", t:"Handover",           one:true }
+];
+var PLAN_LANES = PLAN.filter(function(x){ return !x.one; });
+function hasPlan(p){ return !!(p && p.plan && PLAN.some(function(x){ var v = p.plan[x.k]; return x.one ? !!v : !!(v && (v.start || v.end)); })); }
+function planDates(p){ var out = []; if(!p || !p.plan) return out; PLAN.forEach(function(x){ var v = p.plan[x.k]; if(!v) return; if(x.one) out.push(v); else { if(v.start) out.push(v.start); if(v.end) out.push(v.end); } }); return out; }
 function projectSpan(p){ var s = p.start || null, e = p.due || null;
+  planDates(p).forEach(function(v){ if(!s || v < s) s = v; if(!e || v > e) e = v; });
   drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){ var sp = spanOf(a.stages); if(sp.s && (!s || sp.s < s)) s = sp.s; if(sp.e && (!e || sp.e > e)) e = sp.e; }); });
   return { s:s, e:e }; }
 function progress(p){ var tot = 0, done = 0; drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){ STAGES.forEach(function(st){ var x = a.stages && a.stages[st.k]; if(x && (x.start || x.end)){ tot++; if(x.done) done++; } }); }); }); return tot ? Math.round(done / tot * 100) : 0; }
@@ -417,7 +433,7 @@ function shownProjects(){
 }
 function viewProjects(){
   var all = projects(), shown = shownProjects();
-  var h = '<div class="row" style="margin:12px 0;justify-content:space-between">' + (canEdit() ? '<button class="btn btn-primary" id="newJob">＋ New job</button>' : '<span></span>') + '<button class="btn" id="prList">🖨 Print job list</button></div>';
+  var h = '<div class="row" style="margin:12px 0;justify-content:space-between">' + (canEdit() ? '<button class="btn btn-primary" id="newJob">＋ New job</button>' : '<span></span>') + '<div class="row">' + (user && core.isMainRoot(user) ? '<button class="btn" id="impXl" title="Bring in jobs from your project schedule spreadsheet">📥 Import from Excel</button><input type="file" id="impFile" accept=".xlsx,.xlsm,.xls" class="hide">' : '') + '<button class="btn" id="prList">🖨 Print job list</button></div></div>';
   h += '<div class="card"><div class="seg" style="margin-bottom:10px">' + [["active","Active"]].concat(STATUS).concat([["all","All"]]).map(function(s){ return '<button type="button" data-status="' + s[0] + '" class="' + (ui.status===s[0]?"on":"") + '">' + s[1] + '</button>'; }).join("") + '</div>' +
     '<input id="search" placeholder="Search job no., name, client or site…" value="' + esc(ui.search) + '" style="margin-bottom:12px">';
   if(!shown.length) h += '<div class="empty">' + (all.length ? "No jobs match." : (canEdit() ? "No jobs yet — tap “New job”." : "No jobs yet.")) + '</div>';
@@ -437,15 +453,16 @@ function viewTimeline(){
   if(!ui.tlStart) ui.tlStart = iso(addDays(mondayOf(today()), -7));
   var start = new Date(ui.tlStart + "T00:00:00"), end = addDays(start, DAYS), t0 = today();
   var dayIdx = function(s){ return Math.round((new Date(s + "T00:00:00") - start) / 86400000); };
-  var bar = function(s, e, color, title){ if(!s && !e) return ""; s = s || e; e = e || s; var a = Math.max(0, dayIdx(s)), b = Math.min(DAYS - 1, dayIdx(e)); if(b < 0 || a > DAYS - 1) return "";
-    return '<i class="bar" title="' + esc(title) + '" style="left:' + (a * W + 1) + 'px;width:' + Math.max(W - 2, (b - a + 1) * W - 2) + 'px;background:' + color + '"></i>'; };
+  var bar = function(s, e, color, title, extra){ if(!s && !e) return ""; s = s || e; e = e || s; var a = Math.max(0, dayIdx(s)), b = Math.min(DAYS - 1, dayIdx(e)); if(b < 0 || a > DAYS - 1) return "";
+    return '<i class="bar" title="' + esc(title) + '" style="' + (extra || "") + 'left:' + (a * W + 1) + 'px;width:' + Math.max(W - 2, (b - a + 1) * W - 2) + 'px;background:' + color + '"></i>'; };
   var cols = 'grid-template-columns:240px ' + DAYS * W + 'px';
   var weeks = ''; for(var w = 0; w < DAYS / 7; w++){ var wd = addDays(start, w * 7); weeks += '<span style="position:absolute;left:' + (w * 7 * W) + 'px;width:' + (7 * W) + 'px;border-left:1px solid var(--line);text-align:left;padding-left:4px">' + wd.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }) + '</span>'; }
   var ti = dayIdx(t0), todayCol = ti >= 0 && ti < DAYS ? '<i style="position:absolute;top:0;bottom:0;left:' + (ti * W) + 'px;width:' + W + 'px;background:rgba(224,163,58,.12)"></i>' : '';
   var rows = '';
   var ps = projects().filter(function(p){ return p.status !== "complete" || ui.tlAll; });
   ps.forEach(function(p){ var sp = projectSpan(p), open = !!ui.open[p.id];
-    rows += '<div class="gl p" data-toggle="' + esc(p.id) + '">' + (open ? "▾ " : "▸ ") + esc(pLabel(p)) + '</div><div class="gc">' + todayCol + bar(sp.s, sp.e, "#3E6A8A", pLabel(p) + ": " + fmtD(sp.s) + " → " + fmtD(sp.e)) +
+    var lanes = hasPlan(p) ? PLAN_LANES.map(function(x, i){ var v = p.plan[x.k]; return v && (v.start || v.end) ? bar(v.start, v.end, x.c, x.t + ": " + fmtD(v.start) + " → " + fmtD(v.end), "top:" + (3 + i * 6) + "px;height:5px;") : ""; }).join("") : "";
+    rows += '<div class="gl p" data-toggle="' + esc(p.id) + '"' + (hasPlan(p) ? ' style="min-height:36px"' : '') + '>' + (open ? "▾ " : "▸ ") + esc(pLabel(p)) + '</div><div class="gc"' + (hasPlan(p) ? ' style="min-height:36px"' : '') + '>' + todayCol + (hasPlan(p) ? lanes : bar(sp.s, sp.e, "#3E6A8A", pLabel(p) + ": " + fmtD(sp.s) + " → " + fmtD(sp.e))) +
       (p.due && dayIdx(p.due) >= 0 && dayIdx(p.due) < DAYS ? '<i title="Due ' + esc(fmtD(p.due)) + '" style="position:absolute;top:3px;bottom:3px;left:' + (dayIdx(p.due) * W + W / 2 - 1) + 'px;width:2px;background:#E39A80"></i>' : '') + '</div>';
     if(open) drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){
       rows += '<div class="gl a" title="' + esc((d.no || "") + " " + a.name) + '">' + esc((d.no ? d.no + " · " : "") + a.name) + '</div><div class="gc">' + todayCol +
@@ -453,9 +470,9 @@ function viewTimeline(){
   });
   return '<div class="row" style="margin:12px 0;justify-content:space-between"><div class="row"><button class="btn btn-sm" id="tlPrev">◀ 4 weeks</button><button class="btn btn-sm" id="tlToday">This week</button><button class="btn btn-sm" id="tlNext">4 weeks ▶</button><button class="btn btn-sm" id="prTl">🖨 Print</button></div>' +
     '<label class="small" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="tlAll" style="width:auto"' + (ui.tlAll ? " checked" : "") + '> show completed jobs</label></div>' +
-    '<div class="legend"><span><i class="stg" style="background:#3E6A8A"></i>Job</span>' + STAGES.map(function(s){ return '<span><i class="stg" style="background:' + s.c + '"></i>' + s.t + '</span>'; }).join("") + '<span><i class="stg" style="background:#4F7A45"></i>Done</span><span><i class="stg" style="background:#E39A80"></i>Due date</span></div>' +
+    '<div class="legend"><span><i class="stg" style="background:#3E6A8A"></i>Job</span><span><i class="stg" style="background:#8C8CB8"></i>Design</span>' + STAGES.map(function(s){ return '<span><i class="stg" style="background:' + s.c + '"></i>' + s.t + '</span>'; }).join("") + '<span><i class="stg" style="background:#4F7A45"></i>Done</span><span><i class="stg" style="background:#E39A80"></i>Due date</span></div>' +
     (ps.length ? '<div class="gantt"><div class="g" style="' + cols + '"><div class="gh" style="position:sticky;left:0;z-index:2;text-align:left;padding-left:8px">Job — tap to open the breakdown</div><div class="gh" style="position:relative;height:18px">' + weeks + '</div>' + rows + '</div></div>' +
-      '<p class="small muted">Dates come from each job\'s drawing breakdown (Projects → job → Drawings & breakdown).</p>' : '<div class="empty">No jobs yet.</div>');
+      '<p class="small muted">Each job shows its programme (design → cutting → edging → manufacturing → install); jobs without one show their drawing-breakdown dates. Tap a job to see its items.</p>' : '<div class="empty">No jobs yet.</div>');
 }
 
 // ---- one job ----
@@ -477,6 +494,7 @@ function viewOverview(p){
     '<div>Status</div><div>' + statusPill(p.status) + '</div><div>Start</div><div>' + fmtD(p.start) + '</div><div>Due / handover</div><div>' + fmtD(p.due) + '</div>' +
     (p.notes ? '<div>Notes</div><div>' + esc(p.notes) + '</div>' : '') + '</div>' +
     (canEdit() ? '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="editJob">✎ Edit job</button></div>' : '') + '</div>';
+  h += planCard(p) + installCard(p);
   h += '<div class="card"><h2>Site</h2><div class="kv">' +
     '<div>Address</div><div>' + (s.address ? esc(s.address) + ' · <a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address) + '" target="_blank" rel="noopener" style="color:var(--amber)">map</a>' : "—") + '</div>' +
     '<div>Site contact</div><div>' + esc(s.contact || "—") + (s.tel ? ' · <a href="tel:' + esc(String(s.tel).replace(/[^\d+]/g, "")) + '" style="color:var(--amber)">' + esc(s.tel) + '</a>' : '') + '</div>' +
@@ -484,7 +502,7 @@ function viewOverview(p){
     (canEdit() ? '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="editSite">✎ Edit site</button></div>' : '') + '</div>';
   h += '<div class="card"><h2>Site diary</h2>' + (canEdit() ? '<div class="row" style="gap:8px;align-items:flex-end;margin-bottom:10px"><div style="flex:1;min-width:220px"><label>Note</label><input id="slNote" placeholder="e.g. Measured reception; walls not square"></div>' +
       '<div><label>Photo (optional)</label><input type="file" id="slPhoto" accept="image/*"></div><button class="btn btn-primary" id="slAdd">Add</button></div>' : '') +
-    (log.length ? '<ul class="hist">' + log.map(function(e){ return '<li><b>' + esc(fmtD((e.ts||"").slice(0,10))) + '</b> · ' + esc(e.by || "") + '<div>' + esc(e.note || "") + '</div>' + (e.photoUrl ? '<a href="' + esc(e.photoUrl) + '" target="_blank" rel="noopener"><img src="' + esc(e.photoUrl) + '" alt="" style="max-width:220px;border-radius:8px;margin-top:6px"></a>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing logged on site yet.</div>') + '</div>';
+    (log.length ? '<ul class="hist">' + log.map(function(e){ return '<li><b>' + esc(fmtD((e.ts||"").slice(0,10))) + '</b> · ' + esc(e.by || "") + '<div style="white-space:pre-line">' + esc(e.note || "") + '</div>' + (e.photoUrl ? '<a href="' + esc(e.photoUrl) + '" target="_blank" rel="noopener"><img src="' + esc(e.photoUrl) + '" alt="" style="max-width:220px;border-radius:8px;margin-top:6px"></a>' : '') + '</li>'; }).join("") + '</ul>' : '<div class="empty">Nothing logged on site yet.</div>') + '</div>';
   return h;
 }
 function stageCell(p, d, a, st){
@@ -822,6 +840,173 @@ function cutModal(p, d, asmId, fromTick){
     }catch(e){ btn.disabled = false; toast("Couldn't save: " + (e.message || e), "err"); }
   };
 }
+// ---- programme & installation cards (2026-10-17) ----
+function planCard(p){
+  var pl = p.plan || {};
+  var rows = PLAN.map(function(x){ var v = pl[x.k]; var txt = x.one ? fmtD(v) : (v && (v.start || v.end) ? fmtD(v.start) + " → " + fmtD(v.end) : "—");
+    return '<div>' + (x.c ? '<i class="stg" style="background:' + x.c + '"></i>' : '') + esc(x.t) + (x.k === "quote" && pl.quoteStatus ? ' <span class="mini">(' + esc(pl.quoteStatus) + ')</span>' : '') + '</div><div>' + txt + '</div>'; }).join("");
+  return '<div class="card"><h2>Programme</h2>' + (hasPlan(p) ? '<div class="kv">' + rows + '</div>' : '<div class="empty">No programme dates yet.</div>') +
+    (canEdit() ? '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="editPlan">✎ Edit programme</button></div>' : '') + '</div>';
+}
+function planModal(p){
+  var pl = p.plan || {};
+  openModal('<h2>Programme — ' + esc(pLabel(p)) + '</h2><p class="small muted" style="margin-top:0">The whole job from quote to handover. Item-by-item dates stay in Drawings &amp; breakdown.</p>' +
+    PLAN.map(function(x){ var v = pl[x.k] || (x.one ? "" : {});
+      return x.one ? '<div class="grid2"><div><label>' + esc(x.t) + '</label><input type="date" data-pl="' + x.k + '" value="' + esc(v || "") + '"></div>' + (x.k === "quote" ? '<div><label>Quote status</label><input id="plQs" value="' + esc(pl.quoteStatus || "") + '" placeholder="e.g. Approved, TBC"></div>' : '<div></div>') + '</div>'
+        : '<div class="grid2"><div><label>' + esc(x.t) + ' start</label><input type="date" data-pl="' + x.k + '" data-e="start" value="' + esc(v.start || "") + '"></div><div><label>' + esc(x.t) + ' end</label><input type="date" data-pl="' + x.k + '" data-e="end" value="' + esc(v.end || "") + '"></div></div>'; }).join("") +
+    '<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div>');
+  q("#mCancel").onclick = closeModal;
+  q("#mOk").onclick = async function(){ if(!freshUser() || !canEdit()) return;
+    var out = { quoteStatus:val("plQs") };
+    qa("[data-pl]").forEach(function(inp){ var k = inp.getAttribute("data-pl"), e = inp.getAttribute("data-e");
+      if(e){ out[k] = out[k] || {}; out[k][e] = inp.value || ""; } else out[k] = inp.value || ""; });
+    PLAN.forEach(function(x){ var v = out[x.k]; if(!x.one && v){ if(v.start && !v.end) v.end = v.start; if(v.end && !v.start) v.start = v.end; if(v.start > v.end){ var t = v.start; v.start = v.end; v.end = t; } } });
+    try{ await db.ref("projects/list/" + p.id + "/plan").set(out); closeModal(); toast("Programme saved.", "ok"); render(); }
+    catch(e){ toast("Couldn't save: " + (e.message || e), "err"); } };
+}
+var INST = [["crewLead","Crew lead"],["teamSize","Team size"],["phase","Phase"],["tasks","Tasks"],["materials","Materials on site"],["factoryReady","Factory items ready"],["progress","Progress %"],["status","Status"],["issues","Issues / risks"]];
+function installCard(p){
+  var ins = p.install || {}, any = INST.some(function(f){ return ins[f[0]] !== "" && ins[f[0]] != null; });
+  return '<div class="card"><h2>Installation</h2>' + (any ? '<div class="kv">' + INST.filter(function(f){ return ins[f[0]] !== "" && ins[f[0]] != null; }).map(function(f){ return '<div>' + esc(f[1]) + '</div><div>' + esc(ins[f[0]]) + (f[0] === "progress" ? "%" : "") + '</div>'; }).join("") + '</div>' +
+      (num(ins.progress) ? '<div class="prog" style="margin-top:8px"><i style="width:' + Math.min(100, num(ins.progress)) + '%"></i></div>' : '') : '<div class="empty">No installation details yet.</div>') +
+    (canEdit() ? '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="editInst">✎ Edit installation</button></div>' : '') + '</div>';
+}
+function installModal(p){
+  var ins = p.install || {};
+  openModal('<h2>Installation — ' + esc(pLabel(p)) + '</h2><div class="grid2">' + INST.map(function(f){ return '<div' + (f[0] === "tasks" || f[0] === "issues" ? ' style="grid-column:1/-1"' : '') + '><label>' + esc(f[1]) + '</label><input data-in="' + f[0] + '" value="' + esc(ins[f[0]] == null ? "" : ins[f[0]]) + '"' + (f[0] === "progress" || f[0] === "teamSize" ? ' type="number" min="0"' : '') + '></div>'; }).join("") + '</div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">Save</button></div>');
+  q("#mCancel").onclick = closeModal;
+  q("#mOk").onclick = async function(){ if(!freshUser() || !canEdit()) return; var out = {};
+    qa("[data-in]").forEach(function(inp){ out[inp.getAttribute("data-in")] = String(inp.value || "").trim(); });
+    try{ await db.ref("projects/list/" + p.id + "/install").set(out); closeModal(); toast("Installation saved.", "ok"); render(); }
+    catch(e){ toast("Couldn't save: " + (e.message || e), "err"); } };
+}
+
+// ---- import the project schedule spreadsheet (main root, 2026-10-17) ----
+function xlsxLib(){ if(window.XLSX) return Promise.resolve();
+  return new Promise(function(res, rej){ var sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = res; sc.onerror = function(){ rej(new Error("couldn't load the Excel reader — check the internet connection")); }; document.head.appendChild(sc); }); }
+function nk(s){ return String(s == null ? "" : s).toLowerCase().replace(/['’`]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+function xDate(v){
+  if(v == null || v === "") return "";
+  if(typeof v === "number" && v > 20000 && v < 80000){ var d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000); return d.toISOString().slice(0, 10); }
+  var t = String(v).trim(), m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+  m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); if(m) return m[3] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2);
+  return "";
+}
+function xTxt(v){ return v == null ? "" : String(v).trim(); }
+// a sheet as objects keyed by its header row (the row whose first cell starts with "Project")
+function xSheet(wb, re){
+  var name = wb.SheetNames.find(function(n){ return re.test(n); }); if(!name) return [];
+  var rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, raw:true, defval:null }), hi = rows.findIndex(function(r){ return r && /^project/i.test(xTxt(r[0])) && r.filter(function(c){ return xTxt(c); }).length >= 3; });
+  if(hi < 0) return [];
+  var head = rows[hi].map(function(h){ return nk(h); });
+  return rows.slice(hi + 1).map(function(r){ var o = {}; head.forEach(function(h, i){ if(h) o[h] = r[i]; }); return o; });
+}
+function isDone(st){ return /^(complete|completed|done|finished)$/i.test(xTxt(st)); }
+function parseSchedule(wb){
+  var J = {}, order = [];
+  var job = function(name){ var k = nk(name); if(!k) return null; if(!J[k]){ J[k] = { name:xTxt(name).replace(/\s+/g, " "), client:"", quoteStatus:"", stage:"", overall:"", plan:null, notes:"", items:[], install:null, site:"", diary:[] }; order.push(k); } return J[k]; };
+  xSheet(wb, /pipeline/i).forEach(function(r){ var j = job(r["project name"]); if(!j) return;
+    j.client = xTxt(r.client) || j.client; j.quoteStatus = xTxt(r["quote status"]); j.stage = xTxt(r["current stage"]); j.overall = xTxt(r["overall status"]); });
+  xSheet(wb, /timeline/i).forEach(function(r){ var j = job(r.project); if(!j) return;
+    var rg = function(a, b){ var s = xDate(r[a]), e = xDate(r[b]); if(!s && !e) return null; s = s || e; e = e || s; if(s > e){ var t = s; s = e; e = t; } return { start:s, end:e }; };
+    j.plan = { quote:xDate(r.quote), design:rg("design start", "design end"), approval:xDate(r["design approval"]), fab:xDate(r["fab start"]), cutting:rg("cut start", "cut end"), edging:rg("edge start", "edge end"), mfg:rg("mfg start", "mfg end"), install:rg("install start", "install end"), handover:xDate(r.handover) };
+    if(xTxt(r.notes)) j.notes = xTxt(r.notes); });
+  var last = "";
+  xSheet(wb, /factory|production/i).forEach(function(r){ var pn = xTxt(r.project) || last; last = pn; var item = xTxt(r["item component"]); if(!pn || !item) return;
+    var j = job(pn), st = {}, notes = [];
+    var stage = function(key, status, date){ var d = xDate(date), s = xTxt(status); if(!d && !isDone(s)) { if(/progress/i.test(s)) notes.push(key + " in progress"); return; }
+      st[key] = { start:d, end:d }; if(isDone(s)) st[key].done = { at:d ? d + "T12:00:00.000Z" : new Date().toISOString(), by:"Excel import" }; else if(/progress/i.test(s)) notes.push(key + " in progress"); };
+    stage("cutting", r["cutting status"], r["cutting complete"]); stage("edging", r["edging status"], r["edging complete"]); stage("assembly", r["manufacturing status"], r["manufacturing complete"]);
+    if(isDone(r["sanding status"])) st.spraying = { start:"", end:"", done:{ at:new Date().toISOString(), by:"Excel import" } };
+    if(isDone(r["ready for install"]) || /^yes/i.test(xTxt(r["ready for install"]))) st.dispatch = { start:"", end:"", done:{ at:new Date().toISOString(), by:"Excel import" } };
+    if(/drawing/i.test(xTxt(r["cutting status"]))) notes.unshift("waiting on drawing");
+    if(xTxt(r.notes)) notes.push(xTxt(r.notes));
+    Object.keys(st).forEach(function(k){ if(!st[k].start) delete st[k].start; if(!st[k].end) delete st[k].end; });
+    j.items.push({ name:item, qty:num(r.qty) || 1, notes:notes.join(" · "), stages:st }); });
+  // installation + site rows name phases differently ("NH Hotel - Phase 1") — find the job they belong to
+  var resolve = function(name, site){ var k = nk(name); if(!k) return null; if(J[k]) return J[k];
+    var k2 = nk(String(name).replace(/\s*[-–]\s*phase\s*\d+.*$/i, "")); if(J[k2]) return J[k2];
+    var c = order.filter(function(x){ return x.indexOf(k2) === 0 || k2.indexOf(x) === 0; });
+    if(c.length > 1){ var sw = nk(site).split(" ").filter(function(w){ return w.length > 3 && k2.split(" ").indexOf(w) < 0; }); var best = c.find(function(x){ return sw.some(function(w){ return x.indexOf(w) >= 0; }); }); if(best) return J[best]; }
+    if(c.length) return J[c[0]];
+    var sk = nk(site); if(J[sk]) return J[sk];
+    return job(name); };
+  xSheet(wb, /install/i).forEach(function(r){ var j = resolve(r["project name"], r["site location"]); if(!j) return;
+    j.site = j.site || xTxt(r["site location"]);
+    j.install = Object.assign(j.install || {}, { crewLead:xTxt(r["crew lead"]), teamSize:xTxt(r["team size"]), phase:xTxt(r.phase), tasks:xTxt(r["daily tasks"]), materials:xTxt(r["materials on site"]), factoryReady:xTxt(r["factory items ready"]), progress:xTxt(r["progress"]), status:xTxt(r.status) }); });
+  xSheet(wb, /site/i).forEach(function(r){ var j = resolve(r.project, r["site location"]); if(!j) return;
+    j.site = j.site || xTxt(r["site location"]);
+    var lines = [["Phase", r["current phase"]], ["Today's tasks", r["todays tasks"]], ["Completed", r["completed items"]], ["Factory", r["factory status"]], ["Materials", r["materials status"]], ["Issues / risks", r["issues risks"]], ["Next steps", r["next steps"]], ["Est. completion", xDate(r["est completion"]) ? fmtD(xDate(r["est completion"])) : ""], ["Status", r.status]]
+      .filter(function(x){ return xTxt(x[1]); }).map(function(x){ return x[0] + ": " + xTxt(x[1]); });
+    if(lines.length) j.diary.push(lines.join("\n"));
+    if(xTxt(r["issues risks"])){ j.install = j.install || {}; j.install.issues = xTxt(r["issues risks"]); } });
+  // clients for jobs that only appear on the production / timeline sheets: borrow from a job with the same name start
+  var stem = function(k){ var w = k.split(" "); return w[0].length >= 4 ? w[0] : w.slice(0, 2).join(" "); };
+  order.forEach(function(k){ var j = J[k]; if(j.client) return; var sib = order.find(function(x){ return x !== k && J[x].client && stem(x) === stem(k); }); if(sib) j.client = J[sib].client; });
+  order.forEach(function(k){ var j = J[k], st = nk(j.stage), ov = nk(j.overall);
+    j.status = ov === "complete" || st === "handover" ? "complete" : /install/.test(st) ? "installing" : /cutting|manufactur|edging|production|sanding/.test(st) ? "production" : /hold/.test(ov) ? "hold"
+      : j.items.some(function(i){ return Object.keys(i.stages).some(function(s){ return i.stages[s].done; }) || /in progress/.test(i.notes); }) ? "production" : "planning"; });
+  return order.map(function(k){ return J[k]; });
+}
+async function importExcel(file){
+  if(!user || !core.isMainRoot(user)){ toast("Only the main root can import.", "err"); return; }
+  var jobs;
+  try{ toast("Reading " + file.name + "…"); await xlsxLib(); var wb = XLSX.read(await file.arrayBuffer(), { type:"array" }); jobs = parseSchedule(wb); }
+  catch(e){ toast("Couldn't read that file: " + (e.message || e), "err"); return; }
+  if(!jobs.length){ toast("No projects found — is this the project schedule spreadsheet?", "err"); return; }
+  var have = {}; projects().forEach(function(p){ have[nk(p.name)] = p; });
+  var nItems = jobs.reduce(function(a, j){ return a + j.items.length; }, 0), newClients = {};
+  jobs.forEach(function(j){ if(j.client && !clients().some(function(c){ return nk(c.name) === nk(j.client); })) newClients[nk(j.client)] = j.client; });
+  var st = function(s){ return (STATUS.find(function(x){ return x[0] === s; }) || STATUS[0])[1]; };
+  openModal('<h2>Import from ' + esc(file.name) + '</h2><p class="small muted" style="margin-top:0">' + jobs.length + ' jobs · ' + nItems + ' production items · ' + Object.keys(newClients).length + ' new clients. Jobs already in the app are topped up (nothing you typed is overwritten).</p>' +
+    '<div style="max-height:52vh;overflow:auto"><table class="ol"><thead><tr><th>Job</th><th>Client</th><th>Status</th><th>Programme</th><th class="n">Items</th><th>Install</th><th></th></tr></thead><tbody>' +
+    jobs.map(function(j){ var sp = j.plan ? planDates({ plan:j.plan }).sort() : [];
+      return '<tr><td><b>' + esc(j.name) + '</b>' + (j.site ? '<div class="mini">📍 ' + esc(j.site) + '</div>' : '') + '</td><td class="mini">' + esc(j.client || "—") + '</td><td class="mini">' + esc(st(j.status)) + '</td><td class="mini">' + (sp.length ? esc(fmtD(sp[0]) + " → " + fmtD(sp[sp.length - 1])) : "—") + '</td><td class="n">' + j.items.length + '</td><td class="mini">' + esc(j.install && j.install.crewLead ? j.install.crewLead : "") + (j.diary.length ? " · site notes" : "") + '</td><td class="mini">' + (have[nk(j.name)] ? "update" : '<span style="color:var(--green)">new</span>') + '</td></tr>'; }).join("") +
+    '</tbody></table></div><div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="mCancel">Cancel</button><button class="btn btn-primary" id="mOk">📥 Import ' + jobs.length + ' jobs</button></div>');
+  q("#mCancel").onclick = closeModal;
+  q("#mOk").onclick = async function(){
+    if(!freshUser() || !core.isMainRoot(user)) return;
+    var btn = this; btn.disabled = true; btn.textContent = "Importing…";
+    var who = user.username, ts = new Date().toISOString(), made = 0, upd = 0, items = 0, cl = 0;
+    try{
+      var cid = {}; clients().forEach(function(c){ cid[nk(c.name)] = c.id; });
+      for(var ck in newClients){ var id = uid(); await db.ref("clients/list/" + id).set({ name:newClients[ck], created:ts, createdBy:who, fromExcel:true }); cid[ck] = id; cl++; }
+      for(var i = 0; i < jobs.length; i++){ var j = jobs[i], ex = have[nk(j.name)], pid = ex ? ex.id : uid();
+        var asm = {}; j.items.forEach(function(it, n){ var a = { name:it.name, qty:it.qty, notes:it.notes, n:n }; if(Object.keys(it.stages).length) a.stages = it.stages; asm[uid() + n] = a; });
+        var diary = {}; j.diary.forEach(function(t, n){ diary[uid() + "d" + n] = { ts:ts, by:who + " (Excel import)", note:t }; });
+        var dwg = j.items.length ? { no:"FS", title:"Factory production schedule", rev:"", by:who, created:ts, fromExcel:true, assemblies:asm } : null;
+        if(!ex){
+          var rec = { name:j.name, jobNo:"", clientId:j.client ? (cid[nk(j.client)] || "") : "", status:j.status, notes:j.notes, site:{ address:j.site || "" }, created:ts, createdBy:who, fromExcel:true };
+          if(j.plan){ rec.plan = Object.assign({ quoteStatus:j.quoteStatus }, j.plan); rec.start = (j.plan.design && j.plan.design.start) || j.plan.quote || ""; rec.due = j.plan.handover || (j.plan.install && j.plan.install.end) || ""; }
+          else if(j.quoteStatus) rec.plan = { quoteStatus:j.quoteStatus };
+          if(j.install) rec.install = j.install;
+          if(dwg) rec.drawings = (function(){ var o = {}; o[uid()] = dwg; return o; })();
+          if(j.diary.length) rec.siteLog = diary;
+          await db.ref("projects/list/" + pid).set(JSON.parse(JSON.stringify(rec))); made++;
+        } else {
+          var u = {};
+          if(!ex.clientId && j.client) u.clientId = cid[nk(j.client)] || "";
+          if(!hasPlan(ex) && j.plan) u.plan = Object.assign({ quoteStatus:j.quoteStatus }, j.plan);
+          if(!ex.start && j.plan) u.start = (j.plan.design && j.plan.design.start) || j.plan.quote || "";
+          if(!ex.due && j.plan) u.due = j.plan.handover || "";
+          if(!ex.notes && j.notes) u.notes = j.notes;
+          if(!(ex.site && ex.site.address) && j.site) u["site/address"] = j.site;
+          if(!ex.install && j.install) u.install = j.install;
+          if(j.items.length){ var fs = drawings(ex).find(function(d){ return d.fromExcel; });
+            if(!fs){ u["drawings/" + uid()] = dwg; }
+            else { var names = assemblies(fs).map(function(a){ return nk(a.name); }), base = assemblies(fs).length;
+              Object.keys(asm).forEach(function(k){ if(names.indexOf(nk(asm[k].name)) < 0){ asm[k].n = base++; u["drawings/" + fs.id + "/assemblies/" + k] = asm[k]; } }); } }
+          var old = list(ex.siteLog).map(function(e){ return e.note; });
+          Object.keys(diary).forEach(function(k){ if(old.indexOf(diary[k].note) < 0) u["siteLog/" + k] = diary[k]; });
+          if(Object.keys(u).length){ await db.ref("projects/list/" + pid).update(JSON.parse(JSON.stringify(u))); upd++; }
+        }
+        items += j.items.length;
+      }
+      closeModal(); toast("Imported: " + made + " new jobs, " + upd + " updated, " + cl + " new clients, " + items + " production items.", "ok"); render();
+    }catch(e){ btn.disabled = false; btn.textContent = "📥 Try again"; toast("Import stopped: " + (e.message || e) + " — " + made + " jobs were already added; running it again tops up the rest.", "err"); }
+  };
+}
 async function returnMat(p, m){
   if(!freshUser() || !canMat()) return;
   if(!confirm(m.stock ? "Put " + m.qty + " " + (m.unit || "") + " × " + m.item + " back into stock at " + m.location + "?" : "Remove this record?")) return;
@@ -859,6 +1044,8 @@ function bind(){
   qa("[data-client]").forEach(function(c){ c.onclick = function(e){ e.preventDefault(); if(!hasClients()) return; ui.view = "client"; ui.cid = c.getAttribute("data-client"); render(); window.scrollTo(0, 0); }; });
   if(q("#back")) q("#back").onclick = function(){ ui.view = "list"; render(); window.scrollTo(0, 0); };
   if(q("#newJob")) q("#newJob").onclick = function(){ jobModal(null); };
+  if(q("#impXl")) q("#impXl").onclick = function(){ q("#impFile").click(); };
+  if(q("#impFile")) q("#impFile").onchange = function(){ var f = this.files && this.files[0]; this.value = ""; if(f) importExcel(f); };
   if(q("#prList")) q("#prList").onclick = printJobList;
   if(q("#prTl")) q("#prTl").onclick = printTimelineModal;
   if(q("#prJob")) q("#prJob").onclick = function(){ printJobModal(D.projects[ui.pid]); };
@@ -881,6 +1068,8 @@ function bind(){
   qa("[data-ptab]").forEach(function(b){ b.onclick = function(){ ui.ptab = b.getAttribute("data-ptab"); render(); }; });
   if(q("#editJob")) q("#editJob").onclick = function(){ jobModal(p); };
   if(q("#editSite")) q("#editSite").onclick = function(){ siteModal(p); };
+  if(q("#editPlan")) q("#editPlan").onclick = function(){ planModal(p); };
+  if(q("#editInst")) q("#editInst").onclick = function(){ installModal(p); };
   if(q("#slAdd")) q("#slAdd").onclick = async function(){ if(!freshUser() || !canEdit()) return;
     var note = val("slNote"), f = q("#slPhoto").files[0], btn = this; if(!note && !f){ toast("Write a note or add a photo.", "err"); return; }
     btn.disabled = true; btn.textContent = f ? "Uploading…" : "Adding…";
@@ -933,6 +1122,14 @@ function prJobSections(p, opt){
       '<tr><td>Site</td><td>' + esc(s.address || "—") + '</td><td>Site contact</td><td>' + esc(s.contact || "—") + (s.tel ? " · " + esc(s.tel) : "") + '</td></tr>' +
       (s.access ? '<tr><td>Access / hours</td><td colspan="3">' + esc(s.access) + '</td></tr>' : '') +
       (p.notes ? '<tr><td>Notes</td><td colspan="3">' + esc(p.notes) + '</td></tr>' : '') + '</table>';
+    if(hasPlan(p)) h += '<h3>Programme</h3><table class="pg"><thead><tr>' + PLAN.map(function(x){ return '<th>' + (x.c ? '<i style="background:' + x.c + '"></i>' : '') + esc(x.t) + '</th>'; }).join("") + '</tr></thead><tbody><tr>' +
+      PLAN.map(function(x){ var v = p.plan[x.k]; return '<td>' + esc(x.one ? dShort(v) : v ? stageTxt(v) : "") + '</td>'; }).join("") + '</tr></tbody></table>';
+    var ins = p.install || {};
+    if(Object.keys(ins).some(function(k){ return ins[k] !== "" && ins[k] != null; })) h += '<h3>Installation</h3><table class="pk">' +
+      '<tr><td>Crew lead</td><td>' + esc(ins.crewLead || "—") + (ins.teamSize ? ' · team of ' + esc(ins.teamSize) : '') + '</td><td>Phase</td><td>' + esc(ins.phase || "—") + '</td></tr>' +
+      '<tr><td>Tasks</td><td>' + esc(ins.tasks || "—") + '</td><td>Status</td><td>' + esc(ins.status || "—") + (ins.progress !== "" && ins.progress != null ? ' · ' + esc(ins.progress) + '%' : '') + '</td></tr>' +
+      '<tr><td>Materials on site</td><td>' + esc(ins.materials || "—") + '</td><td>Factory items ready</td><td>' + esc(ins.factoryReady || "—") + '</td></tr>' +
+      (ins.issues ? '<tr><td>Issues / risks</td><td colspan="3">' + esc(ins.issues) + '</td></tr>' : '') + '</table>';
   }
   if(opt.breakdown){
     var ds = drawings(p);
@@ -962,7 +1159,7 @@ function prJobSections(p, opt){
   }
   if(opt.diary){
     var log = list(p.siteLog).sort(function(a,b){ return String(a.ts).localeCompare(String(b.ts)); });
-    h += '<h3>Site diary</h3>' + (log.length ? log.map(function(e){ return '<div class="pdi"><b>' + esc(fmtD((e.ts || "").slice(0,10))) + '</b> · ' + esc(e.by || "") + '<div>' + esc(e.note || "") + '</div>' + (opt.photos && e.photoUrl ? '<img src="' + esc(e.photoUrl) + '" alt="">' : '') + '</div>'; }).join("") : '<p class="pm">Nothing logged on site yet.</p>');
+    h += '<h3>Site diary</h3>' + (log.length ? log.map(function(e){ return '<div class="pdi"><b>' + esc(fmtD((e.ts || "").slice(0,10))) + '</b> · ' + esc(e.by || "") + '<div style="white-space:pre-line">' + esc(e.note || "") + '</div>' + (opt.photos && e.photoUrl ? '<img src="' + esc(e.photoUrl) + '" alt="">' : '') + '</div>'; }).join("") : '<p class="pm">Nothing logged on site yet.</p>');
   }
   return h;
 }
@@ -1009,12 +1206,13 @@ function printTimelineHtml(asm){
   var weeks = ''; for(var k = 0; k < DAYS / 7; k++) weeks += '<span style="left:' + pct(k * 7) + '">' + esc(dShort(iso(addDays(start, k * 7)))) + '</span>';
   var rows = '';
   projects().filter(function(p){ return p.status !== "complete" || ui.tlAll; }).forEach(function(p){ var sp = projectSpan(p);
-    rows += '<tr class="gj"><td>' + esc(pLabel(p)) + (clientName(p.clientId) ? '<div class="pm">' + esc(clientName(p.clientId)) + '</div>' : '') + '</td><td class="gc">' + grid + tcol + bar(sp.s, sp.e, "#3E6A8A") +
+    var pl = hasPlan(p) ? PLAN_LANES.map(function(x, i){ var v = p.plan[x.k]; return v && (v.start || v.end) ? bar(v.start, v.end, x.c).replace('class="gb" style="', 'class="gb" style="top:' + (2 + i * 4) + 'px;height:3.5px;') : ""; }).join("") : "";
+    rows += '<tr class="gj"><td>' + esc(pLabel(p)) + (clientName(p.clientId) ? '<div class="pm">' + esc(clientName(p.clientId)) + '</div>' : '') + '</td><td class="gc"' + (hasPlan(p) ? ' style="height:24px"' : '') + '>' + grid + tcol + (hasPlan(p) ? pl : bar(sp.s, sp.e, "#3E6A8A")) +
       (p.due && di(p.due) >= 0 && di(p.due) < DAYS ? '<i class="gd" style="left:' + pct(di(p.due) + 0.5) + '"></i>' : '') + '</td></tr>';
     if(asm) drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){
       rows += '<tr><td class="ga">' + esc((d.no ? d.no + " · " : "") + a.name) + '</td><td class="gc">' + grid + tcol + STAGES.map(function(st){ var x = a.stages && a.stages[st.k]; return x ? bar(x.start, x.end, x.done ? "#4F7A45" : st.c) : ""; }).join("") + '</td></tr>'; }); });
   });
-  var legend = '<div class="pl"><span><i style="background:#3E6A8A"></i>Job</span>' + STAGES.map(function(s){ return '<span><i style="background:' + s.c + '"></i>' + esc(s.t) + '</span>'; }).join("") + '<span><i style="background:#4F7A45"></i>Done</span><span><i style="background:#D0603F;width:3px"></i>Due date</span></div>';
+  var legend = '<div class="pl"><span><i style="background:#3E6A8A"></i>Job</span><span><i style="background:#8C8CB8"></i>Design</span>' + STAGES.map(function(s){ return '<span><i style="background:' + s.c + '"></i>' + esc(s.t) + '</span>'; }).join("") + '<span><i style="background:#4F7A45"></i>Done</span><span><i style="background:#D0603F;width:3px"></i>Due date</span></div>';
   return prHead("Production timeline", esc(fmtD(iso(start))) + " → " + esc(fmtD(iso(end)))) + legend +
     (rows ? '<table class="gtab"><thead><tr><th>Job</th><th class="gh">' + weeks + '</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="pm">No jobs.</p>');
 }
