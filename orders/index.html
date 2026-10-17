@@ -802,7 +802,7 @@ function solidDesc(n){ var t = n.thickness, w = n.width, l = n.length;
 function solidDec(b){ return !!b && b.kind === "solid" && (b.unit === "m³" || b.unit === "lm"); }
 function boardItems(){
   return list(D.board && D.board.boards).map(function(b){
-    return { id:"b:" + b.code, target:"board", solid:b.kind === "solid", ref:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
+    return { id:"b:" + b.code, target:"board", solid:b.kind === "solid", job:b.stockType === "job", ref:b.code, desc:b.description||"", size:b.category||"", label:(b.description||b.code) + (b.category ? " (" + b.category + ")" : ""), text:[b.description,b.category].join(" "), unit:b.unit||"EA" }; })
     .sort(function(a,b){ return a.label.localeCompare(b.label); });
 }
 function consItems(){
@@ -810,7 +810,7 @@ function consItems(){
   Object.keys(D.cons.items||{}).forEach(function(id){ var it = D.cons.items[id]; if(!it) return;
     var name = (it.size||"") + (it.packSize ? " (" + it.packSize + ")" : "");
     var u = UNITS[it.unit] || "pack(s)";
-    out.push({ id:"c:s:" + id, target:"consumables", ref:"s:" + id, kind:"screw", rid:id, label:name + " · " + u, text:[it.size,it.packSize,it.category].join(" "), unit:u }); });
+    out.push({ id:"c:s:" + id, target:"consumables", ref:"s:" + id, kind:"screw", job:it.stockType === "job", rid:id, label:name + " · " + u + (it.stockType === "job" ? " — for job " + (it.job || "") : ""), text:[it.size,it.packSize,it.category].join(" "), unit:u }); });
   Object.keys(D.cons.types||{}).forEach(function(id){ var t = D.cons.types[id]; if(!t) return;
     if(t.category === "liquid") out.push({ id:"c:l:" + id, target:"consumables", ref:"l:" + id, kind:"liquid", rid:id, label:t.name + " · litres", text:t.name, unit:"litres" });
     else out.push({ id:"c:u:" + id, target:"consumables", ref:"u:" + id, kind:"unit", rid:id, label:t.name + " · full containers", text:t.name, unit:"container(s)" }); });
@@ -873,7 +873,7 @@ function unitOf(line){
 function matchStock(src, codeUnique){
   var best = { id:"", score:0, how:null };
   [["board", boardItems()], ["consumables", consItems()]].forEach(function(p){
-    var target = p[0], its = p[1].map(function(i){ return { id:i.id, code:"", desc:i.desc, size:i.size, text:i.text }; });
+    var target = p[0], its = p[1].filter(function(i){ return !i.job; }).map(function(i){ return { id:i.id, code:"", desc:i.desc, size:i.size, text:i.text }; });
     var al = {}, raw = D.aliases[target] || {};
     // stockIn aliases store Board codes / consumable refs — convert to our ids
     Object.keys(raw).forEach(function(k){ var a = raw[k]; if(a && a.itemId) al[k] = { itemId: (target === "board" ? "b:" : "c:") + a.itemId }; });
@@ -1317,10 +1317,11 @@ function stockOptions(sel){
   if(canBoard(user)) o += '<option value="new:solid"' + (sel==="new:solid"?" selected":"") + '>＋ New solid wood…</option>';
   if(canCons(user)) o += '<option value="new:cons"' + (sel==="new:cons"?" selected":"") + '>＋ New consumable…</option>';
   o += '<option value="new:tool"' + (sel==="new:tool"?" selected":"") + '>🔧 Tool — goes into the Tools app…</option>';
+  var notJob = function(i){ return !i.job || i.id === sel; };
   var bopt = function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; };
-  if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().filter(function(i){ return !i.solid; }).map(bopt).join("") + '</optgroup>';
-  if(canBoard(user) && boardItems().some(function(i){ return i.solid; })) o += '<optgroup label="Solid wood">' + boardItems().filter(function(i){ return i.solid; }).map(bopt).join("") + '</optgroup>';
-  if(canCons(user)) o += '<optgroup label="Consumables">' + consItems().map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
+  if(canBoard(user)) o += '<optgroup label="Board Stock">' + boardItems().filter(function(i){ return !i.solid && notJob(i); }).map(bopt).join("") + '</optgroup>';
+  if(canBoard(user) && boardItems().some(function(i){ return i.solid; })) o += '<optgroup label="Solid wood">' + boardItems().filter(function(i){ return i.solid && notJob(i); }).map(bopt).join("") + '</optgroup>';
+  if(canCons(user)) o += '<optgroup label="Consumables">' + consItems().filter(notJob).map(function(i){ return '<option value="' + esc(i.id) + '"' + (i.id===sel?" selected":"") + '>' + esc(i.label) + '</option>'; }).join("") + '</optgroup>';
   return o;
 }
 function newFieldsHtml(l){
@@ -1337,6 +1338,24 @@ function newFieldsHtml(l){
   if(l.stock === "new:tool") return '<div class="newf">' + f("name","Tool name (as it shows in Tools)",n.name,"Makita 18V drill") + f("category","Category",n.category,"Power tools") +
     '<div class="small muted" style="grid-column:1/-1">When it is received, each one is added to the Tools app at that location, ready to be signed out.</div></div>';
   return "";
+}
+// ---- bought for one job (2026-10-17): the line goes into Board Stock / Consumables under the job's name, never reordered ----
+function jobLabelOf(pid){ var p = D.projects && D.projects[pid]; return p ? (p.jobNo ? p.jobNo + " · " : "") + (p.name || "") : ""; }
+function openJobs(){ return Object.keys(D.projects || {}).map(function(k){ return { id:k, p:D.projects[k] }; }).filter(function(x){ return x.p && x.p.status !== "complete"; })
+  .sort(function(a, b){ return String(b.p.jobNo || "").localeCompare(String(a.p.jobNo || ""), undefined, { numeric:true }); }); }
+function jobable(l){ var st = l && l.stock; if(!st) return false;
+  if(st === "new:board" || st === "new:solid" || st.indexOf("b:") === 0 || st.indexOf("c:s:") === 0) return true;
+  return st === "new:cons" && !(l.nf && l.nf.unit === "litre"); }
+function jobTag(l){ return l && l.forJob ? ' <span class="tag new" style="margin-left:4px">for job ' + esc(jobLabelOf(l.forJob) || l.forJobLabel || "") + '</span>' : ''; }
+function forJobHtml(l){
+  var st = l.stock || "";
+  if(!jobable(l)) return (st.indexOf("c:l:") === 0 || st.indexOf("c:u:") === 0 || (st === "new:cons" && l.nf && l.nf.unit === "litre")) ? '<div class="small muted" style="margin-top:6px">Liquids and containers always go into general stock.</div>' : '';
+  var js = openJobs(), has = js.some(function(x){ return x.id === l.forJob; });
+  return '<div class="prow"><label>For</label><select data-forjob="' + l.key + '" style="width:auto;max-width:100%">' +
+    '<option value="">Stock (normal — reordered when low)</option>' +
+    (l.forJob && !has ? '<option value="' + esc(l.forJob) + '" selected>Job ' + esc(jobLabelOf(l.forJob) || l.forJobLabel || "") + '</option>' : '') +
+    js.map(function(x){ return '<option value="' + esc(x.id) + '"' + (x.id === l.forJob ? " selected" : "") + '>Job only: ' + esc(jobLabelOf(x.id)) + '</option>'; }).join("") + '</select>' +
+    (l.forJob ? '<span class="small muted">sits in ' + (targetOf(st) === "board" ? "Board Stock" : "Consumables") + ' under this job until it is used</span>' : '') + '</div>';
 }
 function lineCls(l){ if(!l.stock) return "check"; if(l.stock === "none") return "skip"; if(l.stock.indexOf("new:") === 0) return "new"; return (l.how === "fuzzy" && l.score < 0.75) ? "check" : "ok"; }
 function viewEdit(){
@@ -1362,6 +1381,9 @@ function viewEdit(){
   h += '<div class="card"><h2><span class="step">3</span>Check the lines</h2>';
   if(!d.lines.length) h += '<div class="empty">Lines from the quotation show here. Link each to the board or consumable it goes into when it arrives.</div>';
   else {
+    if(openJobs().length && d.lines.some(jobable)){ var allJ = d.lines.filter(jobable), one = allJ.every(function(l){ return l.forJob && l.forJob === allJ[0].forJob; }) ? allJ[0].forJob : (allJ.every(function(l){ return !l.forJob; }) ? "" : "__mixed");
+      h += '<div class="prow" style="margin:0 0 10px"><label><b>Whole order is for</b></label><select id="dAllJob" style="width:auto;max-width:100%"><option value=""' + (one === "" ? " selected" : "") + '>Stock</option>' + (one === "__mixed" ? '<option value="__mixed" selected>Mixed — set per line below</option>' : '') +
+        openJobs().map(function(x){ return '<option value="' + esc(x.id) + '"' + (x.id === one ? " selected" : "") + '>Job only: ' + esc(jobLabelOf(x.id)) + '</option>'; }).join("") + '</select><span class="small muted">or set each line\'s “For” below</span></div>'; }
     h += '<p class="small muted" style="margin-top:0"><span class="tag ok">matched</span> <span class="tag check">please check</span> <span class="tag new">new item</span> Amber lines without an item still need linking so the delivery goes into stock. Grey = not stock.</p><div class="lines">';
     d.lines.forEach(function(l){
       h += '<div class="line ' + lineCls(l) + '">' + (l.text ? '<div class="src">' + esc(l.text) + '</div>' + (l.size ? '<div class="small" style="margin:-2px 0 6px"><b>' + esc(l.desc || "") + '</b> · size ' + esc(l.size) + '</div>' : '') : '<div class="newf" style="grid-template-columns:1fr;margin:0 0 8px"><div><label>Description</label><input data-text="' + l.key + '" value="' + esc(l.desc||"") + '" placeholder="What was ordered"></div></div>') +
@@ -1372,7 +1394,7 @@ function viewEdit(){
         '<div class="prow"><label>' + (l.priceBy === "m3" ? "Price per m³ excl. VAT" : "Unit price excl. VAT") + '</label><span class="rprefix">R</span><input type="number" inputmode="decimal" min="0" step="0.01" data-price="' + l.key + '" value="' + (l.price === "" || l.price == null ? "" : esc(l.price)) + '" placeholder="0.00"><span class="amt" data-amt="' + l.key + '">' + (num(l.price) ? "= " + money(lineAmt(l)) : "") + '</span></div>' +
         (solidPcsInfo(l) || l.priceBy === "m3" ? '<div class="prow"><label>Priced</label><select data-priceby="' + l.key + '" style="width:auto"><option value="">per piece</option><option value="m3"' + (l.priceBy === "m3" ? " selected" : "") + '>per m³</option></select>' +
           (l.priceBy === "m3" ? '<input type="number" inputmode="decimal" min="0" step="any" data-m3="' + l.key + '" value="' + (l.m3 === "" || l.m3 == null ? "" : esc(l.m3)) + '" placeholder="' + (m3Each(l) ? (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) : "m³") + '" style="width:110px"><span class="small muted">m³ ' + (m3Each(l) ? '(blank = worked out from the size: ' + (Math.round(num(l.qty) * m3Each(l) * 1000) / 1000) + ')' : '— type the m³ from the quote') + '</span>' : '') + '</div>' : '') +
-        newFieldsHtml(l) + '</div>';
+        newFieldsHtml(l) + forJobHtml(l) + '</div>';
     });
     h += '</div>';
     var tt = orderTotals(d.lines.filter(function(l){ return num(l.qty) > 0; }));
@@ -1408,7 +1430,7 @@ function viewOrder(o){
   var pz = hasPrices(lines), tz = orderTotals(lines);
   h += '<div class="card"><h2>Lines</h2><div style="overflow-x:auto"><table class="ol"><thead><tr><th>Item</th><th class="n">Ordered</th>' + (pz ? '<th class="n">Unit price</th><th class="n">Amount</th>' : '') + '<th class="n">Received</th><th class="n">Still to come</th></tr></thead><tbody>' +
     lines.map(function(l){ var ot = outstanding(l);
-      return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + (l.size ? ' <span class="muted">· ' + esc(l.size) + '</span>' : '') + '<div class="sub">→ ' + esc(stockLabel(l)) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td>' + (pz ? '<td class="n">' + (num(l.price) ? money(l.price) + priceNote(l) + (l.priceBy === "m3" ? '<div class="sub">' + lineM3(l) + ' m³</div>' : '') : '—') + '</td><td class="n">' + (num(l.price) ? money(lineAmt(l)) : '—') + '</td>' : '') + '<td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
+      return '<tr class="' + (ot > 0 ? "out" : "full") + '"><td>' + esc(l.desc || l.text || "") + (l.size ? ' <span class="muted">· ' + esc(l.size) + '</span>' : '') + '<div class="sub">→ ' + esc(stockLabel(l)) + jobTag(l) + '</div></td><td class="n">' + num(l.qty) + ' <span class="sub">' + esc(unitOf(l)) + '</span></td>' + (pz ? '<td class="n">' + (num(l.price) ? money(l.price) + priceNote(l) + (l.priceBy === "m3" ? '<div class="sub">' + lineM3(l) + ' m³</div>' : '') : '—') + '</td><td class="n">' + (num(l.price) ? money(lineAmt(l)) : '—') + '</td>' : '') + '<td class="n">' + num(l.received) + '</td><td class="n o">' + (o.status === "closed" && ot > 0 ? '<span class="muted">cancelled ' + ot + '</span>' : (ot || "✓")) + '</td></tr>'; }).join("") +
     '</tbody></table></div>' + (pz ? '<div class="ptot">Total excl. VAT <b>' + money(tz.ex) + '</b> · VAT ' + money(tz.vat) + ' · <b>incl. VAT ' + money(tz.inc) + '</b></div>' : '') + '</div>';
   var dels = Object.keys(o.deliveries || {}).map(function(k){ return Object.assign({ id:k }, o.deliveries[k]); }).sort(function(a,b){ return String(b.ts).localeCompare(String(a.ts)); });
   h += '<div class="card"><h2>Deliveries</h2>' + (dels.length ? '<ul class="hist">' + dels.map(function(d){ var t = new Date(d.ts);
@@ -1635,6 +1657,7 @@ async function saveDraft(){
       o.lines[lid] = { n:n, text:l.text || "", code:l.code || "", desc:l.desc || (st ? "" : l.text) || "", size:l.size || "", qty:num(l.qty), received:num(l.received), stock:l.stock || "", stockLabel: st ? st.label : "", unit: unitOf(l), per: isTin(l) ? (l.per === "litre" ? "litre" : "tin") : packSizeOf(l) ? (l.per || "pack") : "", price: num(l.price) > 0 ? Math.round(num(l.price) * 10000) / 10000 : null,
         priceBy: l.priceBy === "m3" && (solidPcsInfo(l) || (l.m3 !== "" && l.m3 != null)) ? "m3" : "", m3: l.priceBy === "m3" && (solidPcsInfo(l) || (l.m3 !== "" && l.m3 != null)) ? lineM3(l) : null, m3Set: l.priceBy === "m3" && l.m3 !== "" && l.m3 != null };
       if(l.nf && l.stock && l.stock.indexOf("new:") === 0) o.lines[lid].nf = l.nf;
+      if(l.forJob && jobable(l)){ o.lines[lid].forJob = l.forJob; o.lines[lid].forJobLabel = jobLabelOf(l.forJob) || l.forJobLabel || ""; }
     });
     if(o.status === "part" && orderOut(o) === 0) o.status = "received";
     await db.ref("orders/list/" + id).set(o);
@@ -1671,7 +1694,18 @@ async function addBoards(items, loc, who, reason){
     var locs = (cur.locations && cur.locations.length) ? cur.locations : ["Main"], ts = new Date().toISOString();
     items.forEach(function(x){
       var q, b;
-      if(x.stock === "new:board"){
+      if(x.forJob){
+        var src = x.stock.indexOf("b:") === 0 ? cur.boards.find(function(y){ return y.code === x.stock.slice(2); }) : null;
+        if(src && src.stockType === "job" && src.projectId === x.forJob) b = src;          // a later delivery on the same line
+        else {
+          var sn2 = x.nf || {}, proto = src ? { description:src.description || "", category:src.category || "", unit:src.unit || "EA", kind:src.kind || "", species:src.species || "", thickness:src.thickness || "", width:src.width || "", length:src.length || "", grade:src.grade || "", supplierId:src.supplierId || "" }
+            : x.stock === "new:solid" ? { description:solidDesc(sn2), category:"Solid wood", unit:sn2.unit || "pcs", kind:"solid", species:sn2.species || "", thickness:sn2.thickness || "", width:sn2.width || "", length:sn2.length || "", grade:"", supplierId:"" }
+            : { description:sn2.description || "", category:sn2.category || "", unit:"EA", kind:"", supplierId:"" };
+          b = cur.boards.find(function(y){ return y.stockType === "job" && y.projectId === x.forJob && (y.kind || "") === (proto.kind || "") && (y.unit || "EA") === (proto.unit || "EA") && sameBoard(y, proto); });
+          if(!b){ b = Object.assign({}, proto, { code:newBoardCode(cur.boards, "J" + proto.description), qty:{}, reorderLevel:0, reorderNotified:false, stockType:"job", job:x.forJobLabel, projectId:x.forJob, fromCode:src ? src.code : "" });
+            if(!b.kind) delete b.kind; cur.boards.push(b); }
+        }
+      } else if(x.stock === "new:board"){
         b = cur.boards.find(function(y){ return sameBoard(y, x.nf); });
         if(!b){ b = { code:newBoardCode(cur.boards, x.nf.description), description:x.nf.description, category:x.nf.category||"", unit:"EA", qty:{}, reorderLevel:0, reorderNotified:false, supplierId:"" }; cur.boards.push(b); }
       } else if(x.stock === "new:solid"){
@@ -1688,7 +1722,7 @@ async function addBoards(items, loc, who, reason){
       b.qty[loc] = Math.round(((Number(b.qty[loc])||0) + q) * 1000) / 1000;
       var total = Math.round(Object.keys(b.qty).reduce(function(a,k){ return a + (Number(b.qty[k])||0); }, 0) * 1000) / 1000;
       b.reorderNotified = total <= (Number(b.reorderLevel)||0);
-      cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason });
+      cur.log.unshift({ id:uid(), ts:ts, user:who, boardCode:b.code, action:"add", qtyChange:q, resultingQty:total, reason:reason + (x.forJob ? " — for job " + x.forJobLabel : "") });
     });
     return cur;
   });
@@ -1728,6 +1762,7 @@ async function addCons(items, loc){
   var base = "consumablesStock/";
   for(var i = 0; i < items.length; i++){
     var x = items[i], q = x.sq;
+    if(x.forJob){ await addJobCons(x, q, loc, base); continue; }
     // new liquid counted per litre (e.g. 12.5 L hardener) → a Consumables liquid, stock kept in ml
     if(x.stock === "new:cons" && x.nf && x.nf.unit === "litre"){
       var lid2 = uid(), vb = {}; vb[fbKey(loc)] = Math.round(q * 1000);
@@ -1750,6 +1785,22 @@ async function addCons(items, loc){
     x.newStock = x.stock;
   }
 }
+// A consumable bought for one job → its own Consumables item under the job's name (no reorder level).
+async function addJobCons(x, q, loc, base){
+  var it = null, rid = "";
+  if(x.stock.indexOf("c:s:") === 0){ rid = x.stock.slice(4); it = D.cons.items[rid] || null; }
+  var target = it && it.stockType === "job" && it.projectId === x.forJob ? rid : "";
+  var proto = it ? { size:it.size || "", unit:it.unit || "each", category:it.category || "", bundleSize:it.bundleSize || null, packSize:it.packSize || null, supplierId:it.supplierId || "" }
+    : { size:(x.nf && x.nf.name) || "", unit:(x.nf && x.nf.unit) || "each", category:(x.nf && x.nf.unit === "tin") ? "Tins" : "", bundleSize:(x.nf && x.nf.unit === "per500") ? (parseInt(x.nf.bundle) || 500) : null, packSize:(x.nf && x.nf.unit === "tin") ? (x.nf.tinsize || null) : null, supplierId:"" };
+  if(!target) target = Object.keys(D.cons.items || {}).find(function(k){ var y = D.cons.items[k]; return y && y.stockType === "job" && y.projectId === x.forJob && String(y.size || "").toLowerCase() === String(proto.size).toLowerCase() && (y.unit || "per500") === (proto.unit || "per500") && (y.packSize || null) === (proto.packSize || null); }) || "";
+  var qq = (proto.unit === "per500" || proto.unit === "tin") ? Math.round(q * 1000) / 1000 : Math.round(q);
+  if(target){ await db.ref(base + "screwItems/" + target + "/qtyByLocation/" + fbKey(loc)).transaction(function(v){ return Math.round(((Number(v) || 0) + qq) * 1000) / 1000; }); x.newStock = "c:s:" + target; return; }
+  var nid = uid(), qb = {}; qb[fbKey(loc)] = qq;
+  var rec = { size:proto.size, unit:proto.unit, category:proto.category || "", qtyByLocation:qb, reorderQty:0, reorderSent:false, supplierId:proto.supplierId, stockType:"job", job:x.forJobLabel, projectId:x.forJob, fromId:rid || "" };
+  if(proto.bundleSize) rec.bundleSize = proto.bundleSize; if(proto.packSize) rec.packSize = proto.packSize;
+  await db.ref(base + "screwItems/" + nid).set(rec);
+  x.newStock = "c:s:" + nid;
+}
 async function saveReceive(){
   var r = rcv, ready = rcvReady();
   if(!ready.length){ toast("Nothing to receive yet.", "err"); return; }
@@ -1762,7 +1813,8 @@ async function saveReceive(){
     var t = targetOf(c.line.stock);
     if(t === "board" && !canBoard(user)){ toast("You can't add to Board Stock — ask Sean for \"Add stock\" there.", "err"); return; }
     if(t === "consumables" && !canCons(user)){ toast("You can't add to Consumables — ask Sean for access.", "err"); return; }
-    items.push({ c:c, t:t, qty:num(ready[i].qty), sq:toStockQty(c.line, num(ready[i].qty)), stock:c.line.stock || "", nf:c.line.nf || null, src:ready[i].src });
+    items.push({ c:c, t:t, qty:num(ready[i].qty), sq:toStockQty(c.line, num(ready[i].qty)), stock:c.line.stock || "", nf:c.line.nf || null, src:ready[i].src,
+      forJob:jobable(c.line) ? (c.line.forJob || "") : "", forJobLabel:c.line.forJob ? (jobLabelOf(c.line.forJob) || c.line.forJobLabel || "") : "" });
   }
   var who = user.username, loc = r.location, did = uid();
   var byOrder = {}; items.forEach(function(x){ (byOrder[x.c.oid] = byOrder[x.c.oid] || []).push(x); });
@@ -2314,7 +2366,7 @@ function startReorder(){
 function editOrder(o){
   draft = o ? { id:o.id, supplier:o.supplier||"", supplierEmail:o.supplierEmail||"", supplierCc:o.supplierCc||"", ref:o.ref||"", status:o.status === "quote" ? "quote" : "ordered", quoteDate:o.quoteDate, orderedDate:o.orderedDate,
     location:o.location || locationsAll()[0], notes:o.notes||"", dueDate:o.dueDate||"", quoteUrl:o.quoteUrl||"", quoteFile:o.quoteFile||"", file:null,
-    lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), price:l.price == null ? "" : l.price, stock:l.stock||"", nf:l.nf||null, per:l.per||"", priceBy:l.priceBy||"", m3:l.m3Set ? l.m3 : "", how:"picked", score:1 }; }) }
+    lines: orderLines(o).map(function(l){ return { key:++seq, lid:l.lid, text:l.text||"", code:l.code||"", desc:l.desc||"", size:l.size||"", qty:num(l.qty), received:num(l.received), price:l.price == null ? "" : l.price, stock:l.stock||"", nf:l.nf||null, forJob:l.forJob||"", forJobLabel:l.forJobLabel||"", per:l.per||"", priceBy:l.priceBy||"", m3:l.m3Set ? l.m3 : "", how:"picked", score:1 }; }) }
     : { supplier:"", supplierEmail:"", ref:"", status:"ordered", orderedDate:today(), quoteDate:today(), location:ui.loc || locationsAll()[0], notes:"", file:null, lines:[] };
   ui.view = "edit"; render(); window.scrollTo(0, 0);
 }
@@ -2422,6 +2474,8 @@ function bind(){
       if(l.stock === "new:tool" && (!l.nf || l.nf.unit)) l.nf = { name:(l.desc || l.text || "").replace(/\s+/g, " ").trim(), category:"" };
       l.per = guessPer(l);
       render(); }; });
+    qa("[data-forjob]").forEach(function(sel){ sel.onchange = function(){ readDraftFields(); var l = draftLine(sel.getAttribute("data-forjob")); l.forJob = sel.value; l.forJobLabel = jobLabelOf(sel.value); render(); }; });
+    if(q("#dAllJob")) q("#dAllJob").onchange = function(){ var v = this.value; if(v === "__mixed") return; readDraftFields(); draft.lines.forEach(function(l){ if(jobable(l)){ l.forJob = v; l.forJobLabel = jobLabelOf(v); } }); render(); };
     qa("[data-per]").forEach(function(sel){ sel.onchange = function(){ draftLine(sel.getAttribute("data-per")).per = sel.value; readDraftFields(); render(); }; });
     qa("[data-priceby]").forEach(function(sel){ sel.onchange = function(){ var l = draftLine(sel.getAttribute("data-priceby")); l.priceBy = sel.value; if(!l.priceBy) l.m3 = ""; readDraftFields(); render(); }; });
     qa("[data-m3]").forEach(function(inp){ inp.oninput = function(){ var l = draftLine(inp.getAttribute("data-m3")); l.m3 = inp.value === "" ? "" : num(inp.value);
@@ -2480,6 +2534,7 @@ function start(){
     db.ref("consumablesStock/" + k).on("value", function(s){ D.cons[{ screwItems:"items", consumableTypes:"types", suppliers:"suppliers", meta:"meta" }[k]] = s.val() || {}; rr(); });
   });
   db.ref("stockIn/aliases").on("value", function(s){ D.aliases = s.val() || {}; });
+  db.ref("projects/list").on("value", function(s){ D.projects = s.val() || {}; if(ui.view === "order") rr(); }, function(){ D.projects = {}; });
   db.ref("suppliers/list").on("value", function(s){ D.sups = s.val() || {}; if(ui.view === "list") rr(); });
   db.ref("orders/settings").on("value", function(s){ D.settings = s.val() || {}; if(ui.view === "list") rr(); });
   db.ref("orders/poBook").on("value", function(s){ D.poBook = s.val() || null; if(ui.view === "list" || ui.view === "order") rr(); });
