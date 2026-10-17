@@ -140,6 +140,14 @@ table.ol tr.full td{color:var(--muted)}
 .tabs.sub{margin:4px 0 12px}
 .stg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .wrap{max-width:1180px}
+.sbtn{display:inline-flex;gap:2px;align-items:center;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.sbtn:not(:disabled):hover{border-color:var(--amber)}.sbtn:disabled{cursor:default}
+.sbtn.s-doing{color:#F0B85A;border-color:#E0A33A;background:rgba(224,163,58,.14)}
+.sbtn.s-done{color:#8FCB7A;border-color:#4F7A45;background:rgba(79,122,69,.22)}
+.sbtn.s-skip{opacity:.45}
+.cnt{font-size:12px;display:flex;gap:10px;flex-wrap:wrap}.cnt b{font-weight:600}.cnt .s-done{color:#8FCB7A}.cnt .s-doing{color:#F0B85A}.cnt .s-todo{color:var(--muted)}
+table.pg2{min-width:760px}table.pg2 td{vertical-align:middle}.mini.late{color:#E39A80}
+@media(max-width:700px){.sbtn span{display:none}.sbtn{padding:5px 10px;font-size:15px}table.pg2{min-width:520px}}
 table.bd{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
 table.bd th{text-align:left;font-size:11px;color:var(--muted);font-weight:500;padding:5px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
 table.bd td{padding:5px 4px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -187,7 +195,7 @@ table.bd .done{color:var(--green)}
   #printArea .pk td{padding:3px 6px;border:1px solid #ccc;font-size:9.5pt;vertical-align:top}
   #printArea .pk td:nth-child(odd){background:#f3f3f3;color:#444;width:16%;font-size:8.5pt}
   #printArea .pa{width:22%}#printArea .pq{width:5%;text-align:center}#printArea .pr{text-align:right;white-space:nowrap}
-  #printArea .pdn{background:#e3efdf}
+  #printArea .pdn{background:#e3efdf}#printArea .pdo{background:#fbeccc}
   #printArea .pdw{margin:8px 0 3px;break-after:avoid}
   #printArea .pm{color:#555;font-size:8.5pt}
   #printArea .ptot{text-align:right;margin:2px 0 0}
@@ -389,7 +397,20 @@ function projectSpan(p){ var s = p.start || null, e = p.due || null;
   planDates(p).forEach(function(v){ if(!s || v < s) s = v; if(!e || v > e) e = v; });
   drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){ var sp = spanOf(a.stages); if(sp.s && (!s || sp.s < s)) s = sp.s; if(sp.e && (!e || sp.e > e)) e = sp.e; }); });
   return { s:s, e:e }; }
-function progress(p){ var tot = 0, done = 0; drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){ STAGES.forEach(function(st){ var x = a.stages && a.stages[st.k]; if(x && (x.start || x.end)){ tot++; if(x.done) done++; } }); }); }); return tot ? Math.round(done / tot * 100) : 0; }
+// ---- part progress (2026-10-17): every stage of every part is To do → In progress → Done (or Not needed) ----
+function stStatus(x){ return !x ? "todo" : x.skip ? "skip" : x.done ? "done" : x.prog === "doing" ? "doing" : "todo"; }
+var SICON = { todo:"○", doing:"◐", done:"●", skip:"–" }, SLABEL = { todo:"To do", doing:"In progress", done:"Done", skip:"Not needed" };
+function countParts(as){ var c = { todo:0, doing:0, done:0, skip:0 }; as.forEach(function(a){ STAGES.forEach(function(st){ c[stStatus(a.stages && a.stages[st.k])]++; }); });
+  c.total = c.todo + c.doing + c.done; c.pct = c.total ? Math.round(c.done / c.total * 100) : 0; return c; }
+function jobCounts(p){ var all = []; drawings(p).forEach(function(d){ all = all.concat(assemblies(d)); }); return countParts(all); }
+function progress(p){ return jobCounts(p).pct; }
+function canProg(){ return perm("projectsProgress") || canEdit(); }
+function countsHtml(c){ return '<span class="cnt"><b class="s-done">● ' + c.done + ' done</b> <b class="s-doing">◐ ' + c.doing + ' in progress</b> <b class="s-todo">○ ' + c.todo + ' to do</b>' + (c.skip ? ' <span class="mini">· ' + c.skip + ' not needed</span>' : '') + '</span>'; }
+function statusBtn(p, d, a, st){
+  var x = (a.stages && a.stages[st.k]) || {}, s = stStatus(x), path = [p.id, d.id, a.id, st.k].join("|");
+  var who = s === "done" && x.done ? " — " + (x.done.by || "") + " " + fmtD(String(x.done.at || "").slice(0, 10)) : s === "doing" && x.progBy ? " — started by " + x.progBy + " " + fmtD(String(x.progAt || "").slice(0, 10)) : "";
+  return '<button type="button" class="sbtn s-' + s + '" data-sst="' + esc(path) + '"' + (canProg() && s !== "skip" ? "" : " disabled") + ' title="' + esc(st.t + ": " + SLABEL[s] + who + (canProg() && s !== "skip" ? " (tap to change)" : "")) + '">' + SICON[s] + '<span> ' + SLABEL[s] + '</span></button>';
+}
 // Dispatch delivery notes and Orders POs that belong to a job (matched on job number or job name)
 function matchesJob(p, text){ text = String(text || "").toLowerCase(); if(!text) return false;
   if(p.jobNo && text.indexOf(String(p.jobNo).toLowerCase()) >= 0) return true;
@@ -466,7 +487,7 @@ function viewTimeline(){
       (p.due && dayIdx(p.due) >= 0 && dayIdx(p.due) < DAYS ? '<i title="Due ' + esc(fmtD(p.due)) + '" style="position:absolute;top:3px;bottom:3px;left:' + (dayIdx(p.due) * W + W / 2 - 1) + 'px;width:2px;background:#E39A80"></i>' : '') + '</div>';
     if(open) drawings(p).forEach(function(d){ assemblies(d).forEach(function(a){
       rows += '<div class="gl a" title="' + esc((d.no || "") + " " + a.name) + '">' + esc((d.no ? d.no + " · " : "") + a.name) + '</div><div class="gc">' + todayCol +
-        STAGES.map(function(st){ var x = a.stages && a.stages[st.k]; return x ? bar(x.start, x.end, x.done ? "#4F7A45" : st.c, st.t + ": " + fmtD(x.start) + " → " + fmtD(x.end) + (x.done ? " ✓" : "")) : ""; }).join("") + '</div>'; }); });
+        STAGES.map(function(st){ var x = a.stages && a.stages[st.k]; return x && !x.skip ? bar(x.start, x.end, x.done ? "#4F7A45" : st.c, st.t + ": " + fmtD(x.start) + " → " + fmtD(x.end) + (x.done ? " ✓ done" : x.prog === "doing" ? " — in progress" : ""), !x.done && x.prog === "doing" ? "outline:2px dashed #F3D08A;outline-offset:-1px;" : "") : ""; }).join("") + '</div>'; }); });
   });
   return '<div class="row" style="margin:12px 0;justify-content:space-between"><div class="row"><button class="btn btn-sm" id="tlPrev">◀ 4 weeks</button><button class="btn btn-sm" id="tlToday">This week</button><button class="btn btn-sm" id="tlNext">4 weeks ▶</button><button class="btn btn-sm" id="prTl">🖨 Print</button></div>' +
     '<label class="small" style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="tlAll" style="width:auto"' + (ui.tlAll ? " checked" : "") + '> show completed jobs</label></div>' +
@@ -479,7 +500,7 @@ function viewTimeline(){
 function viewProject(p){
   var tabs = [["overview","Job & site"],["drawings","Drawings & breakdown"],["materials","Materials"],["deliveries","Deliveries & orders"]];
   var h = '<button class="backlink" id="back">← All jobs</button><div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">' + esc(pLabel(p)) + '</h2><div class="row" style="gap:8px">' + statusPill(p.status) + '<button class="btn btn-sm" id="prJob">🖨 Print</button></div></div>' +
-    '<div class="small muted" style="margin-top:4px">' + [p.clientId ? '👤 <a href="#" data-client="' + esc(p.clientId) + '" style="color:var(--amber)">' + esc(clientName(p.clientId)) + '</a>' : "", p.due ? "due " + fmtD(p.due) : "", progress(p) ? progress(p) + "% of planned stages done" : ""].filter(Boolean).join(" · ") + '</div></div>';
+    '<div class="small muted" style="margin-top:4px">' + [p.clientId ? '👤 <a href="#" data-client="' + esc(p.clientId) + '" style="color:var(--amber)">' + esc(clientName(p.clientId)) + '</a>' : "", p.due ? "due " + fmtD(p.due) : "", jobCounts(p).total ? progress(p) + "% of stages done" : ""].filter(Boolean).join(" · ") + '</div></div>';
   h += '<div class="tabs sub">' + tabs.map(function(t){ return '<button type="button" data-ptab="' + t[0] + '" class="' + (ui.ptab===t[0]?"on":"") + '">' + t[1] + '</button>'; }).join("") + '</div>';
   if(ui.ptab === "drawings") h += viewDrawings(p);
   else if(ui.ptab === "materials") h += viewMaterials(p);
@@ -509,11 +530,23 @@ function stageCell(p, d, a, st){
   var x = (a.stages && a.stages[st.k]) || {}, path = [p.id, d.id, a.id, st.k].join("|"), ed = canEdit();
   return '<td><div class="cell"><input type="date" data-sd="' + esc(path) + '" data-f="start" value="' + esc(x.start || "") + '"' + (ed ? "" : " disabled") + ' title="' + esc(st.t) + ' start">' +
     '<input type="date" data-sd="' + esc(path) + '" data-f="end" value="' + esc(x.end || "") + '"' + (ed ? "" : " disabled") + ' title="' + esc(st.t) + ' finish">' +
-    '<label' + (x.done ? ' class="done"' : '') + '><input type="checkbox" data-sdone="' + esc(path) + '"' + (x.done ? " checked" : "") + (ed ? "" : " disabled") + '> done</label></div></td>';
+    statusBtn(p, d, a, st) + (ed ? '<label class="mini" style="display:flex;gap:4px;align-items:center;margin:0"><input type="checkbox" data-sskip="' + esc(path) + '"' + (x.skip ? " checked" : "") + ' style="width:auto"> not needed</label>' : '') + '</div></td>';
+}
+function dview(){ if(!ui.dview){ try{ ui.dview = localStorage.getItem("oakPjDview") || ""; }catch(e){} } return ui.dview === "dates" && canEdit() ? "dates" : "progress"; }
+function progGrid(p, d, as){
+  return '<div style="overflow-x:auto;margin-top:10px"><table class="bd pg2"><thead><tr><th>Part</th><th>Qty</th>' + STAGES.map(function(s){ return '<th><i class="stg" style="background:' + s.c + '"></i>' + esc(s.t) + '</th>'; }).join("") + '</tr></thead><tbody>' +
+    as.map(function(a){ var c = countParts([a]);
+      return '<tr><td><b>' + esc(a.name) + '</b>' + (a.notes ? '<div class="mini">' + esc(a.notes) + '</div>' : '') + '<div class="prog" style="margin-top:4px;max-width:140px"><i style="width:' + c.pct + '%"></i></div></td><td>' + esc(a.qty || 1) + '</td>' +
+        STAGES.map(function(st){ var x = (a.stages && a.stages[st.k]) || {}, due = x.end || x.start;
+          return '<td>' + statusBtn(p, d, a, st) + (due && stStatus(x) !== "done" && stStatus(x) !== "skip" ? '<div class="mini' + (due < today() ? ' late' : '') + '">' + (due < today() ? "was due " : "due ") + esc(fmtD(due).replace(/ \d{4}$/, "")) + '</div>' : '') + '</td>'; }).join("") + '</tr>'; }).join("") +
+    '</tbody></table></div>';
 }
 function viewDrawings(p){
-  var ds = drawings(p);
-  var h = (canEdit() ? '<div class="row" style="margin-bottom:12px"><button class="btn btn-primary" id="addDwg">＋ Add drawing</button></div>' : '');
+  var ds = drawings(p), jc = jobCounts(p), mode = dview();
+  var h = '<div class="row" style="margin-bottom:12px;justify-content:space-between">' + (canEdit() ? '<button class="btn btn-primary" id="addDwg">＋ Add drawing</button>' : '<span></span>') +
+    (canEdit() && ds.length ? '<div class="row" style="gap:6px"><span class="mini">View:</span><button type="button" data-dv="progress" class="btn btn-sm' + (mode === "progress" ? " btn-primary" : "") + '">Progress</button><button type="button" data-dv="dates" class="btn btn-sm' + (mode === "dates" ? " btn-primary" : "") + '">Dates &amp; planning</button></div>' : '') + '</div>';
+  if(ds.length && jc.total) h += '<div class="card" style="padding:12px 16px"><div class="row" style="justify-content:space-between"><b>Whole job — ' + jc.pct + '% done</b>' + countsHtml(jc) + '</div><div class="prog"><i style="width:' + jc.pct + '%"></i></div>' +
+    (canProg() ? '<div class="mini" style="margin-top:6px">Tap a stage to move it on: ○ To do → ◐ In progress → ● Done.</div>' : '') + '</div>';
   if(!ds.length) return h + '<div class="card"><div class="empty">No drawings yet.' + (canEdit() ? ' Add each drawing, then break it down into assemblies (e.g. "Reception desk – base units", "Back panel") and give each stage its dates.' : '') + '</div></div>';
   ds.forEach(function(d){ var as = assemblies(d), revs = list(d.revisions).sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
     h += '<div class="dwg"><div class="h"><div><b>' + esc((d.no ? d.no + " — " : "") + (d.title || "Drawing")) + '</b> <span class="mini">rev ' + esc(d.rev || "—") + '</span></div><div class="row">' +
@@ -521,7 +554,8 @@ function viewDrawings(p){
       (canMat() ? '<button class="btn btn-sm" data-cut="' + esc(d.id) + '">🪚 Boards used</button>' : '') +
       (canEdit() ? '<button class="btn btn-sm" data-dwgedit="' + esc(d.id) + '">✎ Edit / new revision</button><button class="btn btn-sm" data-asmadd="' + esc(d.id) + '">＋ Assembly</button>' : '') + '</div></div>' + cutSummary(p, d) +
       (revs.length ? '<div class="mini" style="margin-top:4px">Earlier revisions: ' + revs.map(function(r){ return r.fileUrl ? '<a href="' + esc(r.fileUrl) + '" target="_blank" rel="noopener" style="color:var(--amber)">rev ' + esc(r.rev || "?") + '</a>' : 'rev ' + esc(r.rev || "?"); }).join(", ") + '</div>' : '') +
-      (as.length ? '<div style="overflow-x:auto;margin-top:10px"><table class="bd"><thead><tr><th>Assembly</th><th>Qty</th>' + STAGES.map(function(s){ return '<th><i class="stg" style="background:' + s.c + '"></i>' + esc(s.t) + '</th>'; }).join("") + '<th></th></tr></thead><tbody>' +
+      (as.length ? (function(){ var c = countParts(as); return '<div class="row" style="justify-content:space-between;margin-top:8px">' + countsHtml(c) + '<span class="mini">' + c.pct + '% done</span></div><div class="prog" style="margin-top:4px"><i style="width:' + c.pct + '%"></i></div>'; })() : '') +
+      (as.length && mode === "progress" ? progGrid(p, d, as) : as.length ? '<div style="overflow-x:auto;margin-top:10px"><table class="bd"><thead><tr><th>Assembly</th><th>Qty</th>' + STAGES.map(function(s){ return '<th><i class="stg" style="background:' + s.c + '"></i>' + esc(s.t) + '</th>'; }).join("") + '<th></th></tr></thead><tbody>' +
         as.map(function(a){ return '<tr><td><b>' + esc(a.name) + '</b>' + (a.notes ? '<div class="mini">' + esc(a.notes) + '</div>' : '') + '</td><td>' + esc(a.qty || 1) + '</td>' + STAGES.map(function(st){ return stageCell(p, d, a, st); }).join("") +
           '<td>' + (canEdit() ? '<button class="btn btn-sm" data-asmedit="' + esc(d.id + "|" + a.id) + '">✎</button>' : '') + '</td></tr>'; }).join("") + '</tbody></table></div>' : '<div class="mini" style="margin-top:8px">No assemblies yet — tap “＋ Assembly” to break this drawing down.</div>') + '</div>';
   });
@@ -915,8 +949,8 @@ function parseSchedule(wb){
   var last = "";
   xSheet(wb, /factory|production/i).forEach(function(r){ var pn = xTxt(r.project) || last; last = pn; var item = xTxt(r["item component"]); if(!pn || !item) return;
     var j = job(pn), st = {}, notes = [];
-    var stage = function(key, status, date){ var d = xDate(date), s = xTxt(status); if(!d && !isDone(s)) { if(/progress/i.test(s)) notes.push(key + " in progress"); return; }
-      st[key] = { start:d, end:d }; if(isDone(s)) st[key].done = { at:d ? d + "T12:00:00.000Z" : new Date().toISOString(), by:"Excel import" }; else if(/progress/i.test(s)) notes.push(key + " in progress"); };
+    var stage = function(key, status, date){ var d = xDate(date), s = xTxt(status), doing = /progress/i.test(s); if(!d && !isDone(s) && !doing) return;
+      st[key] = { start:d, end:d }; if(isDone(s)) st[key].done = { at:d ? d + "T12:00:00.000Z" : new Date().toISOString(), by:"Excel import" }; else if(doing){ st[key].prog = "doing"; st[key].progBy = "Excel import"; st[key].progAt = new Date().toISOString(); } };
     stage("cutting", r["cutting status"], r["cutting complete"]); stage("edging", r["edging status"], r["edging complete"]); stage("assembly", r["manufacturing status"], r["manufacturing complete"]);
     if(isDone(r["sanding status"])) st.spraying = { start:"", end:"", done:{ at:new Date().toISOString(), by:"Excel import" } };
     if(isDone(r["ready for install"]) || /^yes/i.test(xTxt(r["ready for install"]))) st.dispatch = { start:"", end:"", done:{ at:new Date().toISOString(), by:"Excel import" } };
@@ -996,7 +1030,13 @@ async function importExcel(file){
           if(j.items.length){ var fs = drawings(ex).find(function(d){ return d.fromExcel; });
             if(!fs){ u["drawings/" + uid()] = dwg; }
             else { var names = assemblies(fs).map(function(a){ return nk(a.name); }), base = assemblies(fs).length;
-              Object.keys(asm).forEach(function(k){ if(names.indexOf(nk(asm[k].name)) < 0){ asm[k].n = base++; u["drawings/" + fs.id + "/assemblies/" + k] = asm[k]; } }); } }
+              Object.keys(asm).forEach(function(k){ var at = names.indexOf(nk(asm[k].name));
+                if(at < 0){ asm[k].n = base++; u["drawings/" + fs.id + "/assemblies/" + k] = asm[k]; return; }
+                var exA = assemblies(fs)[at];   // already imported: only fill in stages nobody has touched in the app
+                Object.keys(asm[k].stages || {}).forEach(function(sk){ var cur = (exA.stages && exA.stages[sk]) || {}, nw = asm[k].stages[sk];
+                  if(cur.done || cur.prog || cur.skip) return;
+                  var o = {}; if(nw.done) o.done = nw.done; if(nw.prog){ o.prog = nw.prog; o.progBy = nw.progBy; o.progAt = nw.progAt; } if(!cur.start && nw.start) o.start = nw.start; if(!cur.end && nw.end) o.end = nw.end;
+                  Object.keys(o).forEach(function(ok){ u["drawings/" + fs.id + "/assemblies/" + exA.id + "/stages/" + sk + "/" + ok] = o[ok]; }); }); }); } }
           var old = list(ex.siteLog).map(function(e){ return e.note; });
           Object.keys(diary).forEach(function(k){ if(old.indexOf(diary[k].note) < 0) u["siteLog/" + k] = diary[k]; });
           if(Object.keys(u).length){ await db.ref("projects/list/" + pid).update(JSON.parse(JSON.stringify(u))); upd++; }
@@ -1087,11 +1127,24 @@ function bind(){
     if(inp.value && other && !other.value){ upd[other.getAttribute("data-f")] = inp.value; }      // a one-day stage until a second date is set
     if(upd.start && upd.end && upd.end < upd.start){ var t = upd.end; upd.end = upd.start; upd.start = t; }
     try{ await db.ref(path).update(upd); }catch(e){ toast("Couldn't save: " + (e.message || e), "err"); } }; });
-  qa("[data-sdone]").forEach(function(inp){ inp.onchange = async function(){ if(!freshUser() || !canEdit()) return;
-    var x = inp.getAttribute("data-sdone").split("|"); if(x.some(function(v){ return !v; })) return;
-    try{ await db.ref("projects/list/" + x[0] + "/drawings/" + x[1] + "/assemblies/" + x[2] + "/stages/" + x[3]).update({ done:inp.checked ? { at:new Date().toISOString(), by:user.username } : null });
-      if(inp.checked && x[3] === "cutting" && canMat()){ var pp = D.projects[x[0]], dd = pp && pp.drawings && pp.drawings[x[1]]; if(dd) cutModal(pp, dd, x[2], true); } }
+  qa("[data-sst]").forEach(function(b){ b.onclick = async function(){ if(!freshUser() || !canProg()) return;
+    var x = b.getAttribute("data-sst").split("|"); if(x.some(function(v){ return !v; })) return;
+    var pp = D.projects[x[0]], dd = pp && pp.drawings && pp.drawings[x[1]], aa = dd && dd.assemblies && dd.assemblies[x[2]]; if(!aa) return;
+    var cur = (aa.stages && aa.stages[x[3]]) || {}, s = stStatus(cur), stg = STAGES.find(function(t){ return t.k === x[3]; }), now = new Date().toISOString(), upd;
+    if(s === "skip") return;
+    if(s === "todo") upd = { prog:"doing", progAt:now, progBy:user.username };
+    else if(s === "doing") upd = { done:{ at:now, by:user.username }, prog:null };
+    else { if(!confirm(aa.name + " — " + stg.t + " is marked done" + (cur.done && cur.done.by ? " by " + cur.done.by : "") + ". Set it back to to do?")) return; upd = { done:null, prog:null, progAt:null, progBy:null }; }
+    b.disabled = true;
+    try{ await db.ref("projects/list/" + x[0] + "/drawings/" + x[1] + "/assemblies/" + x[2] + "/stages/" + x[3]).update(upd);
+      toast(aa.name + " — " + stg.t + ": " + (s === "todo" ? "in progress" : s === "doing" ? "done ✓" : "back to to do"), "ok");
+      if(s === "doing" && x[3] === "cutting" && canMat()) cutModal(pp, dd, x[2], true); }
+    catch(e){ b.disabled = false; toast("Couldn't save: " + (e.message || e), "err"); } }; });
+  qa("[data-sskip]").forEach(function(inp){ inp.onchange = async function(){ if(!freshUser() || !canEdit()) return;
+    var x = inp.getAttribute("data-sskip").split("|"); if(x.some(function(v){ return !v; })) return;
+    try{ await db.ref("projects/list/" + x[0] + "/drawings/" + x[1] + "/assemblies/" + x[2] + "/stages/" + x[3]).update({ skip:inp.checked ? true : null }); }
     catch(e){ toast("Couldn't save: " + (e.message || e), "err"); } }; });
+  qa("[data-dv]").forEach(function(b){ b.onclick = function(){ ui.dview = b.getAttribute("data-dv"); try{ localStorage.setItem("oakPjDview", ui.dview); }catch(e){} render(); }; });
   qa("[data-cut]").forEach(function(b){ b.onclick = function(){ var d = p.drawings[b.getAttribute("data-cut")]; if(d) cutModal(p, d, "", false); }; });
   if(q("#addMat")) q("#addMat").onclick = function(){ matModal(p); };
   qa("[data-matret]").forEach(function(b){ b.onclick = function(){ var m = D.materials[p.id][b.getAttribute("data-matret")]; m.id = b.getAttribute("data-matret"); returnMat(p, m); }; });
@@ -1099,7 +1152,7 @@ function bind(){
 
 // ---------- printing (A4, light, on its own — the screen stays as it is) ----------
 function dShort(s){ if(!s) return ""; var d = new Date(s + "T00:00:00"); return isNaN(d) ? s : d.toLocaleDateString("en-ZA", { day:"2-digit", month:"short" }); }
-function stageTxt(x){ if(!x || (!x.start && !x.end)) return x && x.done ? "✓ done" : ""; var a = dShort(x.start || x.end), b = dShort(x.end || x.start); return (a === b ? a : a + " – " + b) + (x.done ? " ✓" : ""); }
+function stageTxt(x){ if(x && x.skip) return "n/a"; if(x && !x.done && x.prog === "doing" && !x.start && !x.end) return "◐ in progress"; if(!x || (!x.start && !x.end)) return x && x.done ? "✓ done" : ""; var a = dShort(x.start || x.end), b = dShort(x.end || x.start); return (a === b ? a : a + " – " + b) + (x.done ? " ✓" : x.prog === "doing" ? " ◐" : ""); }
 function prHead(title, sub){
   return '<div class="ph"><div><div class="pb">OAK JOINERY</div><div class="pt">' + esc(title) + '</div>' + (sub ? '<div class="ps">' + sub + '</div>' : '') + '</div>' +
     '<div class="pd">Printed ' + esc(fmtD(today())) + '<br>by ' + esc(user ? user.username : "") + '</div></div>';
@@ -1139,7 +1192,7 @@ function prJobSections(p, opt){
       h += '<div class="pdw"><b>' + esc((d.no ? d.no + " — " : "") + (d.title || "")) + '</b>' + (d.rev ? ' <span class="pm">rev ' + esc(d.rev) + '</span>' : '') + '</div>' +
         (as.length ? '<table class="pg"><thead><tr><th class="pa">Assembly</th><th class="pq">Qty</th>' + STAGES.map(function(st){ return '<th><i style="background:' + st.c + '"></i>' + esc(st.t) + '</th>'; }).join("") + '</tr></thead><tbody>' +
           as.map(function(a){ return '<tr><td class="pa"><b>' + esc(a.name) + '</b>' + (a.notes ? '<div class="pm">' + esc(a.notes) + '</div>' : '') + '</td><td class="pq">' + esc(a.qty || "") + '</td>' +
-            STAGES.map(function(st){ var x = a.stages && a.stages[st.k]; return '<td' + (x && x.done ? ' class="pdn"' : '') + '>' + esc(stageTxt(x)) + '</td>'; }).join("") + '</tr>'; }).join("") + '</tbody></table>' : '<p class="pm">No assemblies on this drawing yet.</p>');
+            STAGES.map(function(st){ var x = a.stages && a.stages[st.k]; return '<td' + (x && x.done ? ' class="pdn"' : x && x.prog === "doing" ? ' class="pdo"' : '') + '>' + esc(stageTxt(x)) + '</td>'; }).join("") + '</tr>'; }).join("") + '</tbody></table>' : '<p class="pm">No assemblies on this drawing yet.</p>');
     });
   }
   if(opt.materials){
